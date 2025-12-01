@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+版本更新监控工具入口
+检查所有 AI 编码工具的版本更新
+"""
+
+import subprocess
+import sys
+import os
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+CHECKERS = [
+    {
+        "name": "Claude Code",
+        "script": os.path.join(SCRIPT_DIR, "claude_code", "claude_code_version_check.py"),
+    },
+    {
+        "name": "OpenAI Codex",
+        "script": os.path.join(SCRIPT_DIR, "codex", "codex_version_check.py"),
+    },
+]
+
+
+def run_checker(checker):
+    """运行单个版本检查脚本"""
+    print(f"\n{'=' * 50}")
+    print(f"检查 {checker['name']} 版本更新")
+    print("=" * 50)
+
+    try:
+        result = subprocess.run(
+            [sys.executable, checker["script"]],
+            capture_output=False,
+        )
+        return result.returncode == 0
+    except Exception as e:
+        print(f"运行 {checker['name']} 检查脚本失败: {e}")
+        return False
+
+
+def main():
+    print("版本更新监控工具")
+    print("=" * 50)
+
+    success_count = 0
+    for checker in CHECKERS:
+        if run_checker(checker):
+            success_count += 1
+
+    print(f"\n{'=' * 50}")
+    print(f"检查完成: {success_count}/{len(CHECKERS)} 个工具检查成功")
+    print("=" * 50)
+
+
+if __name__ == "__main__":
+    main()

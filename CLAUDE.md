@@ -9,11 +9,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 运行脚本
 
 ```bash
-# 检查 Claude Code 版本更新
-python claude_code_version_check.py
+# 运行入口文件，检查所有工具的版本更新
+python main.py
 
-# 检查 OpenAI Codex 版本更新（排除 alpha 版本）
-python codex_version_check.py
+# 单独检查 Claude Code 版本更新
+python claude_code/claude_code_version_check.py
+
+# 单独检查 OpenAI Codex 版本更新（排除 alpha 版本）
+python codex/codex_version_check.py
 ```
 
 ## 依赖
@@ -32,5 +35,18 @@ pip install requests
 
 | 脚本 | 数据源 | 版本记录文件 |
 |------|--------|--------------|
-| claude_code_version_check.py | GitHub CHANGELOG.md | claude_code_latest_version.txt |
-| codex_version_check.py | GitHub releases Atom feed | codex_latest_version.txt |
+| claude_code/claude_code_version_check.py | GitHub CHANGELOG.md | claude_code/claude_code_latest_version.txt |
+| codex/codex_version_check.py | GitHub releases Atom feed | codex/codex_latest_version.txt |
+
+## 项目结构
+
+```
+version-push/
+├── main.py                    # 入口文件
+├── claude_code/               # Claude Code 版本检查
+│   ├── claude_code_version_check.py
+│   └── claude_code_latest_version.txt
+└── codex/                     # OpenAI Codex 版本检查
+    ├── codex_version_check.py
+    └── codex_latest_version.txt
+```
