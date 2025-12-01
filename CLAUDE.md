@@ -32,6 +32,7 @@ pip install requests
 2. 解析最新版本号和更新内容
 3. 与本地 `*_latest_version.txt` 对比
 4. 版本变化时打印更新内容并更新本地记录
+5. 发现新版本时发送 Telegram 通知（需配置环境变量）
 
 | 脚本 | 数据源 | 版本记录文件 |
 |------|--------|--------------|
@@ -43,6 +44,9 @@ pip install requests
 ```
 version-push/
 ├── main.py                    # 入口文件
+├── notify/                    # 通知模块
+│   ├── __init__.py
+│   └── telegram.py            # Telegram 通知
 ├── claude_code/               # Claude Code 版本检查
 │   ├── claude_code_version_check.py
 │   └── claude_code_latest_version.txt
@@ -50,3 +54,14 @@ version-push/
     ├── codex_version_check.py
     └── codex_latest_version.txt
 ```
+
+## Telegram 通知配置
+
+设置以下环境变量启用 Telegram 通知：
+
+```bash
+export TELEGRAM_BOT_TOKEN="your_bot_token"
+export TELEGRAM_CHAT_ID="your_chat_id"
+```
+
+未配置时脚本正常运行，仅跳过通知功能。

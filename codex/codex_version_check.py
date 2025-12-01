@@ -7,8 +7,13 @@ OpenAI Codex 版本更新检查脚本
 
 import os
 import re
+import sys
 import xml.etree.ElementTree as ET
 import requests
+
+# 添加项目根目录到路径
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from notify.telegram import send_telegram_message
 
 # 配置
 RELEASES_ATOM_URL = "https://github.com/openai/codex/releases.atom"
@@ -155,6 +160,14 @@ def main():
         print("-" * 50)
         save_version(latest_version, latest_content)
         print("版本信息已更新")
+
+        # 发送 Telegram 通知
+        message = f"*OpenAI Codex 新版本发布*\n\n版本: `{saved_version}` → `{latest_version}`"
+        if release_link:
+            message += f"\n链接: {release_link}"
+        if latest_content:
+            message += f"\n\n{latest_content}"
+        send_telegram_message(message)
 
 
 if __name__ == "__main__":
