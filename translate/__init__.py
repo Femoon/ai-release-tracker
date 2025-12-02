@@ -1,1 +1,1 @@
-from .gemini import translate_changelog
+from .gemini import translate_changelog, format_bilingual

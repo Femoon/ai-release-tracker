@@ -95,6 +95,7 @@ def read_saved_version():
 def save_version(version, content):
     """保存版本信息到本地文件"""
     try:
+        os.makedirs(os.path.dirname(VERSION_FILE), exist_ok=True)
         with open(VERSION_FILE, 'w', encoding='utf-8') as f:
             f.write(f"{version}\n{content}")
         return True
