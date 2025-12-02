@@ -22,7 +22,7 @@ python codex/codex_version_check.py
 ## 依赖
 
 ```bash
-pip install requests
+pip install requests python-dotenv litellm
 ```
 
 ## 架构
@@ -32,7 +32,8 @@ pip install requests
 2. 解析最新版本号和更新内容
 3. 与本地 `*_latest_version.txt` 对比
 4. 版本变化时打印更新内容并更新本地记录
-5. 发现新版本时发送 Telegram 通知（需配置环境变量）
+5. 使用 AI 翻译更新内容（需配置 Gemini API Key）
+6. 发送双语 Telegram 通知（英文原文 + 中文翻译）
 
 | 脚本 | 数据源 | 版本记录文件 |
 |------|--------|--------------|
@@ -47,6 +48,9 @@ version-push/
 ├── notify/                    # 通知模块
 │   ├── __init__.py
 │   └── telegram.py            # Telegram 通知
+├── translate/                 # 翻译模块
+│   ├── __init__.py
+│   └── gemini.py              # Gemini AI 翻译
 ├── claude_code/               # Claude Code 版本检查
 │   ├── claude_code_version_check.py
 │   └── claude_code_latest_version.txt
@@ -70,6 +74,19 @@ export CODEX_CHAT_ID="your_codex_chat_id"
 ```
 
 未配置时脚本正常运行，仅跳过通知功能。
+
+## AI 翻译配置
+
+使用 OpenRouter 调用 Gemini 进行更新内容翻译，通知会显示英文原文和中文翻译：
+
+```bash
+export OPENROUTER_API_KEY="your_openrouter_api_key"
+
+# 可选：指定翻译模型，默认 openrouter/google/gemini-2.5-pro
+export TRANSLATE_MODEL="openrouter/google/gemini-2.5-pro"
+```
+
+未配置时跳过翻译，仅发送英文原文。
 
 ## Docker 部署
 
@@ -109,6 +126,9 @@ CLAUDE_CODE_CHAT_ID=your_claude_code_chat_id
 # OpenAI Codex 通知配置
 CODEX_BOT_TOKEN=your_codex_bot_token
 CODEX_CHAT_ID=your_codex_chat_id
+
+# AI 翻译配置
+OPENROUTER_API_KEY=your_openrouter_api_key
 ```
 
 docker-compose 会自动读取 `.env` 文件。
