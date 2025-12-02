@@ -1,0 +1,11 @@
+services:
+  version-checker:
+    build: .
+    image: version-push:latest
+    container_name: version-push
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+    volumes:
+      - ./output:/app/output
+    restart: "no"

@@ -18,7 +18,8 @@ from notify.telegram import send_telegram_message
 # 配置
 RELEASES_ATOM_URL = "https://github.com/openai/codex/releases.atom"
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-VERSION_FILE = os.path.join(SCRIPT_DIR, "codex_latest_version.txt")
+PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
+VERSION_FILE = os.path.join(PROJECT_ROOT, "output", "codex_latest_version.txt")
 
 # Atom 命名空间
 ATOM_NS = {"atom": "http://www.w3.org/2005/Atom"}

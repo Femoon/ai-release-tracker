@@ -65,3 +65,40 @@ export TELEGRAM_CHAT_ID="your_chat_id"
 ```
 
 未配置时脚本正常运行，仅跳过通知功能。
+
+## Docker 部署
+
+### 构建镜像
+
+```bash
+docker compose build
+```
+
+### 手动运行一次
+
+```bash
+docker compose run --rm version-checker
+```
+
+### 配置定时任务
+
+推荐使用宿主机 cron 定时调用容器（资源消耗最低）：
+
+```bash
+# 编辑 crontab
+crontab -e
+
+# 每小时检查一次
+0 * * * * cd /path/to/version-push && docker compose run --rm version-checker >> /var/log/version-push.log 2>&1
+```
+
+### 配置 Telegram 通知
+
+创建 `.env` 文件：
+
+```bash
+TELEGRAM_BOT_TOKEN=your_bot_token
+TELEGRAM_CHAT_ID=your_chat_id
+```
+
+docker-compose 会自动读取 `.env` 文件。

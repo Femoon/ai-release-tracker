@@ -17,7 +17,8 @@ from notify.telegram import send_telegram_message
 # 配置
 CHANGELOG_URL = "https://raw.githubusercontent.com/anthropics/claude-code/refs/heads/main/CHANGELOG.md"
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-VERSION_FILE = os.path.join(SCRIPT_DIR, "claude_code_latest_version.txt")
+PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
+VERSION_FILE = os.path.join(PROJECT_ROOT, "output", "claude_code_latest_version.txt")
 
 
 def fetch_changelog():
