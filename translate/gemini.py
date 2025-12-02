@@ -5,11 +5,8 @@
 """
 
 import os
+import re
 from litellm import completion
-
-# 加载 .env 文件
-from dotenv import load_dotenv
-load_dotenv()
 
 
 def translate_changelog(
@@ -53,6 +50,9 @@ def translate_changelog(
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,
         )
+        if not response.choices or len(response.choices) == 0:
+            print("翻译失败: API 返回空结果")
+            return ""
         translated = response.choices[0].message.content.strip()
         print("翻译完成")
         return translated
@@ -79,8 +79,6 @@ def format_bilingual(
     Returns:
         str: 格式化后的双语内容（Markdown）
     """
-    import re
-
     def clean_for_telegram(text, remove_version=False):
         """清理内容，移除 Telegram 不支持的 Markdown 语法"""
         # 移除 ## 标题标记

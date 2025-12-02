@@ -32,10 +32,19 @@ def run_checker(checker):
     try:
         result = subprocess.run(
             [sys.executable, checker["script"]],
-            capture_output=False,
+            capture_output=True,
+            text=True,
         )
+        # 输出子进程的标准输出
+        if result.stdout:
+            print(result.stdout, end='')
+        # 输出子进程的错误信息
+        if result.stderr:
+            print(result.stderr, end='')
+        if result.returncode != 0:
+            print(f"脚本退出码: {result.returncode}")
         return result.returncode == 0
-    except Exception as e:
+    except (subprocess.SubprocessError, OSError) as e:
         print(f"运行 {checker['name']} 检查脚本失败: {e}")
         return False
 

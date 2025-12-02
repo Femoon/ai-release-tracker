@@ -7,10 +7,6 @@ Telegram 通知模块
 import os
 import requests
 
-# 加载 .env 文件
-from dotenv import load_dotenv
-load_dotenv()
-
 
 def send_telegram_message(message: str, bot_token: str = None, chat_id: str = None) -> bool:
     """
@@ -26,6 +22,12 @@ def send_telegram_message(message: str, bot_token: str = None, chat_id: str = No
     """
     bot_token = bot_token or os.getenv("TELEGRAM_BOT_TOKEN", "")
     chat_id = chat_id or os.getenv("TELEGRAM_CHAT_ID", "")
+
+    # 验证并清理 token
+    if bot_token:
+        bot_token = bot_token.strip()
+    if chat_id:
+        chat_id = chat_id.strip()
 
     if not bot_token or not chat_id:
         print("Telegram 配置未设置，跳过通知")

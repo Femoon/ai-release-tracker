@@ -77,10 +77,6 @@ def parse_latest_stable_release(feed_xml):
         if content_elem is not None and content_elem.text:
             content = clean_html_content(content_elem.text)
 
-        # 获取更新时间
-        updated_elem = entry.find("atom:updated", ATOM_NS)
-        updated = updated_elem.text if updated_elem is not None else ""
-
         return title, content, link
 
     return None, None, None
@@ -178,9 +174,12 @@ def main():
 
         # 发送 Telegram 通知
         original_content = latest_content or "（暂无更新说明）"
+        content_to_translate = latest_content or ""
         if release_link:
-            original_content = f"链接: {release_link}\n\n{original_content}"
-        translated = translate_changelog(latest_content) if latest_content else ""
+            link_text = f"链接: {release_link}\n\n"
+            original_content = link_text + original_content
+            content_to_translate = link_text + content_to_translate if content_to_translate else ""
+        translated = translate_changelog(content_to_translate) if content_to_translate else ""
         message = format_bilingual(
             version=latest_version,
             original=original_content,

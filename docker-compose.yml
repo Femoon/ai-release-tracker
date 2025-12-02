@@ -4,8 +4,12 @@ services:
     image: version-push:latest
     container_name: version-push
     environment:
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
-      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+      - CLAUDE_CODE_BOT_TOKEN=${CLAUDE_CODE_BOT_TOKEN:-}
+      - CLAUDE_CODE_CHAT_ID=${CLAUDE_CODE_CHAT_ID:-}
+      - CODEX_BOT_TOKEN=${CODEX_BOT_TOKEN:-}
+      - CODEX_CHAT_ID=${CODEX_CHAT_ID:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - TRANSLATE_MODEL=${TRANSLATE_MODEL:-}
     volumes:
       - ./output:/app/output
     restart: "no"
