@@ -83,6 +83,10 @@ def clean_html_content(html_text):
     # 处理 HTML 实体
     clean = clean.replace('&lt;', '<').replace('&gt;', '>').replace('&amp;', '&')
     clean = clean.replace('&quot;', '"').replace('&#39;', "'")
+    # 过滤掉 "Full Changelog:" 行
+    lines = clean.split('\n')
+    lines = [line for line in lines if not line.strip().startswith('Full Changelog:')]
+    clean = '\n'.join(lines)
     # 清理多余空白
     clean = re.sub(r'\n\s*\n', '\n\n', clean)
     return clean.strip()
