@@ -82,8 +82,8 @@ export CODEX_CHAT_ID="your_codex_chat_id"
 ```bash
 export OPENROUTER_API_KEY="your_openrouter_api_key"
 
-# 可选：指定翻译模型，默认 openrouter/google/gemini-2.5-pro
-export TRANSLATE_MODEL="openrouter/google/gemini-2.5-pro"
+# 可选：指定翻译模型，默认 openrouter/google/gemini-2.5-flash
+export TRANSLATE_MODEL="openrouter/google/gemini-2.5-flash"
 ```
 
 未配置时跳过翻译，仅发送英文原文。

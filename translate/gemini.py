@@ -22,13 +22,13 @@ def translate_changelog(
 
     Args:
         content: 要翻译的英文内容
-        model: 模型名称，默认使用环境变量 TRANSLATE_MODEL 或 openrouter/google/gemini-2.5-pro
+        model: 模型名称，默认使用环境变量 TRANSLATE_MODEL 或 openrouter/google/gemini-2.5-flash
         api_key: API Key，默认使用环境变量 OPENROUTER_API_KEY
 
     Returns:
         str: 翻译后的中文内容，失败时返回空字符串
     """
-    model = model or os.getenv("TRANSLATE_MODEL", "openrouter/google/gemini-2.5-pro")
+    model = model or os.getenv("TRANSLATE_MODEL", "openrouter/google/gemini-2.5-flash")
     api_key = api_key or os.getenv("OPENROUTER_API_KEY", "")
 
     if not api_key:
@@ -68,7 +68,7 @@ def format_bilingual(
     title: str = ""
 ) -> str:
     """
-    格式化双语内容
+    格式化双语内容（Markdown 格式，适用于 Telegram）
 
     Args:
         version: 版本号
@@ -77,7 +77,7 @@ def format_bilingual(
         title: 标题（如 "Claude Code" 或 "OpenAI Codex"）
 
     Returns:
-        str: 格式化后的双语内容
+        str: 格式化后的双语内容（Markdown）
     """
     lines = []
 
