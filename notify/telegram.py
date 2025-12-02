@@ -7,6 +7,10 @@ Telegram 通知模块
 import os
 import requests
 
+# 加载 .env 文件
+from dotenv import load_dotenv
+load_dotenv()
+
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 

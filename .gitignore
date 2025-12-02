@@ -29,3 +29,5 @@ env/
 
 # 版本记录文件
 output/
+
+.claude/
