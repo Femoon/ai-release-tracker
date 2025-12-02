@@ -182,7 +182,7 @@ def main():
             original_content = f"链接: {release_link}\n\n{original_content}"
         translated = translate_changelog(latest_content) if latest_content else ""
         message = format_bilingual(
-            version=f"{saved_version} → {latest_version}",
+            version=latest_version,
             original=original_content,
             translated=translated,
             title="OpenAI Codex"

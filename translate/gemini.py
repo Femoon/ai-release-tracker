@@ -79,24 +79,34 @@ def format_bilingual(
     Returns:
         str: 格式化后的双语内容（Markdown）
     """
+    import re
+
+    def clean_for_telegram(text, remove_version=False):
+        """清理内容，移除 Telegram 不支持的 Markdown 语法"""
+        # 移除 ## 标题标记
+        text = re.sub(r'^#{1,6}\s*', '', text, flags=re.MULTILINE)
+        # 移除版本号行（如单独的 "2.0.56" 行）
+        if remove_version:
+            text = re.sub(r'^\d+\.\d+\.\d+\s*$', '', text, flags=re.MULTILINE)
+        # 替换列表符号 "- " 为 "• "
+        text = re.sub(r'^- ', '• ', text, flags=re.MULTILINE)
+        # 清理多余空行
+        text = re.sub(r'\n{3,}', '\n\n', text)
+        return text.strip()
+
+    original_clean = clean_for_telegram(original, remove_version=True)
+    translated_clean = clean_for_telegram(translated, remove_version=True) if translated else ""
+
     lines = []
 
     if title:
-        lines.append(f"*{title} 新版本发布*")
+        lines.append(f"*{title} {version} Released*")
         lines.append("")
 
-    lines.append(f"版本: `{version}`")
-    lines.append("")
-    lines.append("━━━━━━━━━━━━━━━━━━━━")
-    lines.append("📝 *原文 / Original*")
-    lines.append("━━━━━━━━━━━━━━━━━━━━")
-    lines.append(original)
-    lines.append("")
+    lines.append(original_clean)
 
-    if translated:
-        lines.append("━━━━━━━━━━━━━━━━━━━━")
-        lines.append("🇨🇳 *翻译 / Translation*")
-        lines.append("━━━━━━━━━━━━━━━━━━━━")
-        lines.append(translated)
+    if translated_clean:
+        lines.append("")
+        lines.append(translated_clean)
 
     return "\n".join(lines)

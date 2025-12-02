@@ -144,7 +144,7 @@ def main():
         # 发送 Telegram 通知
         translated = translate_changelog(latest_content)
         message = format_bilingual(
-            version=f"{saved_version} → {latest_version}",
+            version=latest_version,
             original=latest_content,
             translated=translated,
             title="Claude Code"
