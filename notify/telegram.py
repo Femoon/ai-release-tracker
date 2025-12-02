@@ -11,27 +11,29 @@ import requests
 from dotenv import load_dotenv
 load_dotenv()
 
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
-
-def send_telegram_message(message: str) -> bool:
+def send_telegram_message(message: str, bot_token: str = None, chat_id: str = None) -> bool:
     """
     发送 Telegram 消息
 
     Args:
         message: 要发送的消息内容，支持 Markdown 格式
+        bot_token: Bot Token，不传则使用环境变量 TELEGRAM_BOT_TOKEN
+        chat_id: Chat ID，不传则使用环境变量 TELEGRAM_CHAT_ID
 
     Returns:
         bool: 发送是否成功
     """
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+    bot_token = bot_token or os.getenv("TELEGRAM_BOT_TOKEN", "")
+    chat_id = chat_id or os.getenv("TELEGRAM_CHAT_ID", "")
+
+    if not bot_token or not chat_id:
         print("Telegram 配置未设置，跳过通知")
         return False
 
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     data = {
-        "chat_id": TELEGRAM_CHAT_ID,
+        "chat_id": chat_id,
         "text": message,
         "parse_mode": "Markdown",
     }

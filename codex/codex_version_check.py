@@ -11,6 +11,10 @@ import sys
 import xml.etree.ElementTree as ET
 import requests
 
+# 加载 .env 文件
+from dotenv import load_dotenv
+load_dotenv()
+
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from notify.telegram import send_telegram_message
@@ -20,6 +24,10 @@ RELEASES_ATOM_URL = "https://github.com/openai/codex/releases.atom"
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
 VERSION_FILE = os.path.join(PROJECT_ROOT, "output", "codex_latest_version.txt")
+
+# Telegram 配置（独立环境变量）
+TELEGRAM_BOT_TOKEN = os.getenv("CODEX_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.getenv("CODEX_CHAT_ID", "")
 
 # Atom 命名空间
 ATOM_NS = {"atom": "http://www.w3.org/2005/Atom"}
@@ -172,7 +180,7 @@ def main():
             message += f"\n链接: {release_link}"
         if latest_content:
             message += f"\n\n{latest_content}"
-        send_telegram_message(message)
+        send_telegram_message(message, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
 
 
 if __name__ == "__main__":

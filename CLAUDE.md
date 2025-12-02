@@ -57,11 +57,16 @@ version-push/
 
 ## Telegram 通知配置
 
-设置以下环境变量启用 Telegram 通知：
+每个工具使用独立的环境变量，可推送到不同的 bot 和频道：
 
 ```bash
-export TELEGRAM_BOT_TOKEN="your_bot_token"
-export TELEGRAM_CHAT_ID="your_chat_id"
+# Claude Code 通知配置
+export CLAUDE_CODE_BOT_TOKEN="your_claude_code_bot_token"
+export CLAUDE_CODE_CHAT_ID="your_claude_code_chat_id"
+
+# OpenAI Codex 通知配置
+export CODEX_BOT_TOKEN="your_codex_bot_token"
+export CODEX_CHAT_ID="your_codex_chat_id"
 ```
 
 未配置时脚本正常运行，仅跳过通知功能。
@@ -97,8 +102,13 @@ crontab -e
 创建 `.env` 文件：
 
 ```bash
-TELEGRAM_BOT_TOKEN=your_bot_token
-TELEGRAM_CHAT_ID=your_chat_id
+# Claude Code 通知配置
+CLAUDE_CODE_BOT_TOKEN=your_claude_code_bot_token
+CLAUDE_CODE_CHAT_ID=your_claude_code_chat_id
+
+# OpenAI Codex 通知配置
+CODEX_BOT_TOKEN=your_codex_bot_token
+CODEX_CHAT_ID=your_codex_chat_id
 ```
 
 docker-compose 会自动读取 `.env` 文件。
