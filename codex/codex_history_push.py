@@ -116,6 +116,9 @@ def clean_release_body(body):
     clean = re.sub(r'^-\s+\s+', '- ', clean, flags=re.MULTILINE)
     clean = re.sub(r'^\*\s+\s+', '* ', clean, flags=re.MULTILINE)
 
+    # 将 GitHub @用户名 转换为超链接
+    clean = re.sub(r'@(\w[\w-]*)', r'[@\1](https://github.com/\1)', clean)
+
     # 清理多余空白和标点
     clean = re.sub(r'\s*:\s*\.?\s*$', '', clean, flags=re.MULTILINE)
     clean = re.sub(r'\s+\)', ')', clean)

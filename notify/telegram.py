@@ -92,22 +92,6 @@ def clean_for_telegram(text: str, remove_version: bool = False) -> str:
     # 替换列表符号 "- " 为 "• "
     text = re.sub(r'^- ', '• ', text, flags=re.MULTILINE)
 
-    # 为非空、非标题、非已有点号的行添加点号
-    lines = text.split('\n')
-    result_lines = []
-    title_patterns = ['Features', 'Bug fixes', 'Maintenance', 'PRs Merged',
-                      '功能', '错误修复', '维护', '链接:', 'Source:']
-    for line in lines:
-        stripped = line.strip()
-        # 跳过空行、已有点号的行、标题行
-        if (not stripped or
-            stripped.startswith('•') or
-            any(stripped.startswith(t) for t in title_patterns)):
-            result_lines.append(line)
-        else:
-            result_lines.append('• ' + line)
-    text = '\n'.join(result_lines)
-
     # 清理多余空行
     text = re.sub(r'\n{3,}', '\n\n', text)
     return text.strip()
