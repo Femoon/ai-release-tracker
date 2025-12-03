@@ -106,6 +106,7 @@ def send_telegram_message(message: str, bot_token: str = None, chat_id: str = No
         "chat_id": chat_id,
         "text": processed_message,
         "parse_mode": "MarkdownV2",
+        "disable_web_page_preview": True,
     }
 
     try:
