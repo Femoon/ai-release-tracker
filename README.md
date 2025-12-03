@@ -1,0 +1,142 @@
+# Version Push
+
+A monitoring tool for tracking version updates of AI coding tools. Automatically checks for new releases and sends bilingual notifications (English + Chinese) to Telegram.
+
+[中文文档](README_CN.md)
+
+## Features
+
+- Monitor multiple AI coding tools for version updates
+- Parse changelogs from GitHub (CHANGELOG.md or Atom feed)
+- AI-powered translation using OpenRouter/Gemini
+- Bilingual Telegram notifications
+- GitHub Actions for automated checking every 30 minutes
+- Docker support for self-hosting
+
+## Supported Tools
+
+| Tool | Data Source | Version File |
+|------|-------------|--------------|
+| Claude Code | GitHub CHANGELOG.md | output/claude_code_latest_version.txt |
+| OpenAI Codex | GitHub releases Atom feed | output/codex_latest_version.txt |
+
+## Quick Start
+
+### Installation
+
+```bash
+git clone https://github.com/your-username/version-push.git
+cd version-push
+pip install -r requirements.txt
+```
+
+### Usage
+
+```bash
+# Check all tools for version updates
+python main.py
+
+# Check Claude Code only
+python claude_code/claude_code_version_check.py
+
+# Check OpenAI Codex only (excludes alpha versions)
+python codex/codex_version_check.py
+
+# Batch push Claude Code historical versions to Telegram
+python claude_code/claude_code_history_push.py              # Push 3 versions (default)
+python claude_code/claude_code_history_push.py --count 5    # Push 5 versions
+python claude_code/claude_code_history_push.py --all        # Push all unpushed versions
+```
+
+## Configuration
+
+### Telegram Notifications
+
+Each tool uses independent environment variables, allowing notifications to different bots/channels:
+
+```bash
+# Claude Code notifications
+export CLAUDE_CODE_BOT_TOKEN="your_bot_token"
+export CLAUDE_CODE_CHAT_ID="your_chat_id"
+
+# OpenAI Codex notifications
+export CODEX_BOT_TOKEN="your_bot_token"
+export CODEX_CHAT_ID="your_chat_id"
+```
+
+Scripts run normally without configuration, just skip notifications.
+
+### AI Translation
+
+Uses OpenRouter to call Gemini for changelog translation:
+
+```bash
+export OPENROUTER_API_KEY="your_openrouter_api_key"
+
+# Optional: specify translation model (default: openrouter/google/gemini-2.5-flash)
+export TRANSLATE_MODEL="openrouter/google/gemini-2.5-flash"
+```
+
+Without configuration, only English content is sent.
+
+## GitHub Actions
+
+The project includes automated version checking (`.github/workflows/version-check.yml`):
+
+- Runs every 30 minutes
+- Automatically commits version record updates
+- Required secrets: `CLAUDE_CODE_BOT_TOKEN`, `CLAUDE_CODE_CHAT_ID`, `CODEX_BOT_TOKEN`, `CODEX_CHAT_ID`, `OPENROUTER_API_KEY`
+
+## Docker Deployment
+
+### Build
+
+```bash
+docker compose build
+```
+
+### Run Once
+
+```bash
+docker compose run --rm version-checker
+```
+
+### Scheduled Task (Cron)
+
+```bash
+# Edit crontab
+crontab -e
+
+# Check every hour
+0 * * * * cd /path/to/version-push && docker compose run --rm version-checker >> /var/log/version-push.log 2>&1
+```
+
+### Environment Variables
+
+Create a `.env` file:
+
+```bash
+# Claude Code
+CLAUDE_CODE_BOT_TOKEN=your_bot_token
+CLAUDE_CODE_CHAT_ID=your_chat_id
+
+# OpenAI Codex
+CODEX_BOT_TOKEN=your_bot_token
+CODEX_CHAT_ID=your_chat_id
+
+# AI Translation
+OPENROUTER_API_KEY=your_openrouter_api_key
+```
+
+## How It Works
+
+1. Fetch version info from remote (CHANGELOG.md or Atom feed)
+2. Parse latest version number and changelog content
+3. Compare with local `output/*_latest_version.txt`
+4. If version changed, print changelog and update local record
+5. Translate content using AI (via LiteLLM + OpenRouter)
+6. Send bilingual Telegram notification
+
+## License
+
+MIT

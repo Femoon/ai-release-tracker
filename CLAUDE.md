@@ -17,47 +17,44 @@ python claude_code/claude_code_version_check.py
 
 # 单独检查 OpenAI Codex 版本更新（排除 alpha 版本）
 python codex/codex_version_check.py
+
+# 批量推送 Claude Code 历史版本到 Telegram（默认推送 3 个）
+python claude_code/claude_code_history_push.py
+python claude_code/claude_code_history_push.py --count 5  # 推送 5 个
+python claude_code/claude_code_history_push.py --all       # 推送所有未推送版本
 ```
 
 ## 依赖
 
 ```bash
+pip install -r requirements.txt
+# 或
 pip install requests python-dotenv litellm
 ```
 
 ## 架构
 
-两个独立脚本，逻辑相似：
+版本检查脚本逻辑：
 1. 从远程获取版本信息（CHANGELOG.md 或 Atom feed）
 2. 解析最新版本号和更新内容
-3. 与本地 `*_latest_version.txt` 对比
+3. 与本地 `output/*_latest_version.txt` 对比
 4. 版本变化时打印更新内容并更新本地记录
-5. 使用 AI 翻译更新内容（需配置 Gemini API Key）
+5. 使用 AI 翻译更新内容（通过 LiteLLM 调用 OpenRouter）
 6. 发送双语 Telegram 通知（英文原文 + 中文翻译）
 
 | 脚本 | 数据源 | 版本记录文件 |
 |------|--------|--------------|
-| claude_code/claude_code_version_check.py | GitHub CHANGELOG.md | claude_code/claude_code_latest_version.txt |
-| codex/codex_version_check.py | GitHub releases Atom feed | codex/codex_latest_version.txt |
+| claude_code/claude_code_version_check.py | GitHub CHANGELOG.md | output/claude_code_latest_version.txt |
+| codex/codex_version_check.py | GitHub releases Atom feed | output/codex_latest_version.txt |
 
-## 项目结构
+历史推送脚本 `claude_code_history_push.py` 会记录已推送版本到 `output/claude_code_pushed_versions.txt`，避免重复推送。
 
-```
-version-push/
-├── main.py                    # 入口文件
-├── notify/                    # 通知模块
-│   ├── __init__.py
-│   └── telegram.py            # Telegram 通知
-├── translate/                 # 翻译模块
-│   ├── __init__.py
-│   └── gemini.py              # Gemini AI 翻译
-├── claude_code/               # Claude Code 版本检查
-│   ├── claude_code_version_check.py
-│   └── claude_code_latest_version.txt
-└── codex/                     # OpenAI Codex 版本检查
-    ├── codex_version_check.py
-    └── codex_latest_version.txt
-```
+## GitHub Actions
+
+项目配置了自动版本检查（`.github/workflows/version-check.yml`）：
+- 每 30 分钟自动运行
+- 检测到新版本时自动提交版本记录更新
+- 需配置 Repository Secrets: `CLAUDE_CODE_BOT_TOKEN`, `CLAUDE_CODE_CHAT_ID`, `CODEX_BOT_TOKEN`, `CODEX_CHAT_ID`, `OPENROUTER_API_KEY`
 
 ## Telegram 通知配置
 
