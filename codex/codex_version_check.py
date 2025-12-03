@@ -17,8 +17,8 @@ load_dotenv()
 
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from notify.telegram import send_telegram_message
-from translate import translate_changelog, format_bilingual
+from notify.telegram import send_bilingual_notification
+from translate import translate_changelog
 
 # 配置
 RELEASES_ATOM_URL = "https://github.com/openai/codex/releases.atom"
@@ -183,13 +183,14 @@ def main():
             original_content = link_text + original_content
             content_to_translate = link_text + content_to_translate if content_to_translate else ""
         translated = translate_changelog(content_to_translate) if content_to_translate else ""
-        message = format_bilingual(
+        send_bilingual_notification(
             version=latest_version,
             original=original_content,
             translated=translated,
-            title="OpenAI Codex"
+            title="OpenAI Codex",
+            bot_token=TELEGRAM_BOT_TOKEN,
+            chat_id=TELEGRAM_CHAT_ID
         )
-        send_telegram_message(message, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
 
 
 if __name__ == "__main__":

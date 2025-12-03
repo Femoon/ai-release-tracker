@@ -16,8 +16,8 @@ load_dotenv()
 
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from notify.telegram import send_telegram_message
-from translate import translate_changelog, format_bilingual
+from notify.telegram import send_bilingual_notification
+from translate import translate_changelog
 
 # 配置
 CHANGELOG_URL = "https://raw.githubusercontent.com/anthropics/claude-code/refs/heads/main/CHANGELOG.md"
@@ -143,13 +143,14 @@ def main():
 
         # 发送 Telegram 通知
         translated = translate_changelog(latest_content)
-        message = format_bilingual(
+        send_bilingual_notification(
             version=latest_version,
             original=latest_content,
             translated=translated,
-            title="Claude Code"
+            title="Claude Code",
+            bot_token=TELEGRAM_BOT_TOKEN,
+            chat_id=TELEGRAM_CHAT_ID
         )
-        send_telegram_message(message, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
 
 
 if __name__ == "__main__":

@@ -25,6 +25,54 @@ def escape_markdown(text: str) -> str:
     return re.sub(f'([{re.escape(escape_chars)}])', r'\\\1', text)
 
 
+def process_message_for_markdown_v2(text: str) -> str:
+    """处理消息，保留粗体标记，转义其他特殊字符"""
+    bold_pattern = r'\*([^*]+)\*'
+    parts = []
+    last_end = 0
+
+    for match in re.finditer(bold_pattern, text):
+        before_text = text[last_end:match.start()]
+        parts.append(escape_markdown(before_text))
+        bold_content = match.group(1)
+        parts.append(f'*{escape_markdown(bold_content)}*')
+        last_end = match.end()
+
+    parts.append(escape_markdown(text[last_end:]))
+    return ''.join(parts)
+
+
+def clean_for_telegram(text: str, remove_version: bool = False) -> str:
+    """清理内容，移除 Telegram 不支持的 Markdown 语法"""
+    # 移除 ## 标题标记
+    text = re.sub(r'^#{1,6}\s*', '', text, flags=re.MULTILINE)
+    # 移除版本号行（如单独的 "2.0.56" 行）
+    if remove_version:
+        text = re.sub(r'^\d+\.\d+\.\d+\s*$', '', text, flags=re.MULTILINE)
+    # 替换列表符号 "- " 为 "• "
+    text = re.sub(r'^- ', '• ', text, flags=re.MULTILINE)
+
+    # 为非空、非标题、非已有点号的行添加点号
+    lines = text.split('\n')
+    result_lines = []
+    title_patterns = ['Features', 'Bug fixes', 'Maintenance', 'PRs Merged',
+                      '功能', '错误修复', '维护', '链接:', 'Source:']
+    for line in lines:
+        stripped = line.strip()
+        # 跳过空行、已有点号的行、标题行
+        if (not stripped or
+            stripped.startswith('•') or
+            any(stripped.startswith(t) for t in title_patterns)):
+            result_lines.append(line)
+        else:
+            result_lines.append('• ' + line)
+    text = '\n'.join(result_lines)
+
+    # 清理多余空行
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
+
+
 def send_telegram_message(message: str, bot_token: str = None, chat_id: str = None) -> bool:
     """
     发送 Telegram 消息
@@ -52,35 +100,7 @@ def send_telegram_message(message: str, bot_token: str = None, chat_id: str = No
 
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
 
-    # 处理消息格式：保留粗体标记 *text*，转义其他特殊字符
-    def process_message_for_markdown_v2(text: str) -> str:
-        """处理消息，保留粗体标记，转义其他特殊字符"""
-        # 先找出所有 *text* 粗体标记
-        bold_pattern = r'\*([^*]+)\*'
-        parts = []
-        last_end = 0
-
-        for match in re.finditer(bold_pattern, text):
-            # 转义粗体标记之前的文本
-            before_text = text[last_end:match.start()]
-            parts.append(escape_markdown(before_text))
-            # 保留粗体标记，但转义内部内容
-            bold_content = match.group(1)
-            parts.append(f'*{escape_markdown(bold_content)}*')
-            last_end = match.end()
-
-        # 转义剩余文本
-        parts.append(escape_markdown(text[last_end:]))
-        return ''.join(parts)
-
     processed_message = process_message_for_markdown_v2(message)
-
-    # Telegram 消息长度限制 4096 字符
-    MAX_LENGTH = 4096
-    if len(processed_message) > MAX_LENGTH:
-        # 截断并添加省略提示
-        truncate_notice = "\n\n\\.\\.\\. \\(内容已截断\\)"
-        processed_message = processed_message[:MAX_LENGTH - len(truncate_notice)] + truncate_notice
 
     data = {
         "chat_id": chat_id,
@@ -96,3 +116,83 @@ def send_telegram_message(message: str, bot_token: str = None, chat_id: str = No
     except requests.RequestException as e:
         print(f"Telegram 通知发送失败: {e}")
         return False
+
+
+# Telegram 消息长度限制
+MAX_MESSAGE_LENGTH = 4096
+
+
+def send_bilingual_notification(
+    version: str,
+    original: str,
+    translated: str,
+    title: str,
+    bot_token: str = None,
+    chat_id: str = None
+) -> bool:
+    """
+    发送双语通知，自动处理长度限制
+
+    - 如果双语合并后 <= 4096 字符，发送一条消息
+    - 如果超出限制，分两条发送（英文一条、中文一条）
+
+    Args:
+        version: 版本号
+        original: 英文原文
+        translated: 中文翻译
+        title: 标题（如 "Claude Code" 或 "OpenAI Codex"）
+        bot_token: Bot Token
+        chat_id: Chat ID
+
+    Returns:
+        bool: 发送是否成功
+    """
+    # 清理内容
+    original_clean = clean_for_telegram(original, remove_version=True)
+    translated_clean = clean_for_telegram(translated, remove_version=True) if translated else ""
+
+    # 英文内容：将 "链接:" 替换为 "Source:"
+    original_en = original_clean.replace('链接:', 'Source:')
+
+    # 生成合并的双语消息
+    lines = []
+    if title:
+        lines.append(f"*{title} {version} Released*")
+        lines.append("")
+    lines.append(original_en)
+    if translated_clean:
+        lines.append("")
+        lines.append(translated_clean)
+    combined_message = "\n".join(lines)
+
+    # 计算转义后长度
+    processed_combined = process_message_for_markdown_v2(combined_message)
+
+    if len(processed_combined) <= MAX_MESSAGE_LENGTH:
+        # 长度在限制内，发送合并消息
+        return send_telegram_message(combined_message, bot_token, chat_id)
+    else:
+        # 超出限制，分两条发送
+        print(f"消息长度 {len(processed_combined)} 超出限制，分两条发送")
+
+        # 英文消息
+        en_lines = []
+        if title:
+            en_lines.append(f"*{title} {version} Released*")
+            en_lines.append("")
+        en_lines.append(original_en)
+        en_message = "\n".join(en_lines)
+
+        # 中文消息
+        cn_lines = []
+        if title:
+            cn_lines.append(f"*{title} {version} 发布*")
+            cn_lines.append("")
+        cn_lines.append(translated_clean if translated_clean else "（无翻译）")
+        cn_message = "\n".join(cn_lines)
+
+        # 发送两条消息
+        result1 = send_telegram_message(en_message, bot_token, chat_id)
+        result2 = send_telegram_message(cn_message, bot_token, chat_id)
+
+        return result1 and result2
