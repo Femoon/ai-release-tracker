@@ -26,7 +26,20 @@ def escape_markdown(text: str) -> str:
 
 
 def process_message_for_markdown_v2(text: str) -> str:
-    """处理消息，保留粗体标记，转义其他特殊字符"""
+    """处理消息，保留粗体标记和超链接，转义其他特殊字符"""
+    # 先提取并保护超链接 [text](url)
+    link_pattern = r'\[([^\]]+)\]\(([^)]+)\)'
+    links = []
+    link_placeholder = "\x00LINK{}\x00"  # 使用不可见字符作为占位符
+
+    def save_link(match):
+        idx = len(links)
+        links.append((match.group(1), match.group(2)))
+        return link_placeholder.format(idx)
+
+    text = re.sub(link_pattern, save_link, text)
+
+    # 处理粗体
     bold_pattern = r'\*([^*]+)\*'
     parts = []
     last_end = 0
@@ -35,11 +48,21 @@ def process_message_for_markdown_v2(text: str) -> str:
         before_text = text[last_end:match.start()]
         parts.append(escape_markdown(before_text))
         bold_content = match.group(1)
-        parts.append(f'*{escape_markdown(bold_content)}*')
+        # 不转义粗体内容中的占位符
+        escaped_bold = escape_markdown(bold_content)
+        parts.append(f'*{escaped_bold}*')
         last_end = match.end()
 
     parts.append(escape_markdown(text[last_end:]))
-    return ''.join(parts)
+    result = ''.join(parts)
+
+    # 恢复超链接（链接文本需要转义，URL 不需要）
+    for idx, (link_text, link_url) in enumerate(links):
+        escaped_text = escape_markdown(link_text)
+        placeholder = escape_markdown(link_placeholder.format(idx))
+        result = result.replace(placeholder, f'[{escaped_text}]({link_url})')
+
+    return result
 
 
 def clean_for_telegram(text: str, remove_version: bool = False) -> str:
@@ -129,7 +152,8 @@ def send_bilingual_notification(
     translated: str,
     title: str,
     bot_token: str = None,
-    chat_id: str = None
+    chat_id: str = None,
+    version_url: str = None
 ) -> bool:
     """
     发送双语通知，自动处理长度限制
@@ -144,6 +168,7 @@ def send_bilingual_notification(
         title: 标题（如 "Claude Code" 或 "OpenAI Codex"）
         bot_token: Bot Token
         chat_id: Chat ID
+        version_url: 版本链接（可选，用于生成超链接标题）
 
     Returns:
         bool: 发送是否成功
@@ -155,10 +180,18 @@ def send_bilingual_notification(
     # 英文内容：将 "链接:" 替换为 "Source:"
     original_en = original_clean.replace('链接:', 'Source:')
 
+    # 构建标题（支持超链接）
+    if version_url:
+        en_title = f"*{title} [{version}]({version_url}) Released*"
+        cn_title = f"*{title} [{version}]({version_url}) 发布*"
+    else:
+        en_title = f"*{title} {version} Released*"
+        cn_title = f"*{title} {version} 发布*"
+
     # 生成合并的双语消息
     lines = []
     if title:
-        lines.append(f"*{title} {version} Released*")
+        lines.append(en_title)
         lines.append("")
     lines.append(original_en)
     if translated_clean:
@@ -179,7 +212,7 @@ def send_bilingual_notification(
         # 英文消息
         en_lines = []
         if title:
-            en_lines.append(f"*{title} {version} Released*")
+            en_lines.append(en_title)
             en_lines.append("")
         en_lines.append(original_en)
         en_message = "\n".join(en_lines)
@@ -187,7 +220,7 @@ def send_bilingual_notification(
         # 中文消息
         cn_lines = []
         if title:
-            cn_lines.append(f"*{title} {version} 发布*")
+            cn_lines.append(cn_title)
             cn_lines.append("")
         cn_lines.append(translated_clean if translated_clean else "（无翻译）")
         cn_message = "\n".join(cn_lines)
