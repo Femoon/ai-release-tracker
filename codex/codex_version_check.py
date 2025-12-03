@@ -93,6 +93,9 @@ def clean_html_content(html_text):
     lines = clean.split('\n')
     lines = [line for line in lines if not line.strip().startswith('Full Changelog:')]
     clean = '\n'.join(lines)
+    # 移除 PRs Merged 部分（太长，会超出 Telegram 4096 字符限制）
+    prs_merged_pattern = r'\n\s*PRs Merged\s*\n.*'
+    clean = re.sub(prs_merged_pattern, '', clean, flags=re.DOTALL)
     # 清理多余空白
     clean = re.sub(r'\n\s*\n', '\n\n', clean)
     return clean.strip()
