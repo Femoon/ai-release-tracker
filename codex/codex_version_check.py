@@ -102,29 +102,24 @@ def clean_html_content(html_text):
 
 
 def read_saved_version():
-    """读取本地保存的版本信息"""
+    """读取本地保存的版本号"""
     if not os.path.exists(VERSION_FILE):
-        return None, None
+        return None
 
     try:
         with open(VERSION_FILE, 'r', encoding='utf-8') as f:
-            content = f.read()
-
-        lines = content.split('\n', 1)
-        version = lines[0].strip()
-        saved_content = lines[1] if len(lines) > 1 else ""
-        return version, saved_content
+            return f.read().strip()
     except Exception as e:
         print(f"读取本地版本文件失败: {e}")
-        return None, None
+        return None
 
 
-def save_version(version, content):
-    """保存版本信息到本地文件"""
+def save_version(version):
+    """保存版本号到本地文件"""
     try:
         os.makedirs(os.path.dirname(VERSION_FILE), exist_ok=True)
         with open(VERSION_FILE, 'w', encoding='utf-8') as f:
-            f.write(f"{version}\n{content}")
+            f.write(version)
         return True
     except Exception as e:
         print(f"保存版本信息失败: {e}")
@@ -149,14 +144,14 @@ def main():
     print(f"远程最新稳定版本: {latest_version}")
 
     # 读取本地保存的版本
-    saved_version, _ = read_saved_version()
+    saved_version = read_saved_version()
 
     if saved_version is None:
         # 首次运行
         print(f"首次运行，已记录版本 {latest_version}")
         if release_link:
             print(f"Release 链接: {release_link}")
-        save_version(latest_version, latest_content)
+        save_version(latest_version)
     elif saved_version == latest_version:
         # 版本相同
         print(f"当前已是最新稳定版本 ({latest_version})")
@@ -172,7 +167,7 @@ def main():
         else:
             print("（暂无更新说明）")
         print("-" * 50)
-        save_version(latest_version, latest_content)
+        save_version(latest_version)
         print("版本信息已更新")
 
         # 发送 Telegram 通知

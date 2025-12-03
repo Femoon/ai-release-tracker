@@ -1,0 +1,64 @@
+name: Version Check
+
+on:
+  # 定时触发：每30分钟检查一次
+  schedule:
+    - cron: '*/30 * * * *'
+  # 手动触发
+  workflow_dispatch:
+  # 推送到 main 分支时触发（可选，用于测试）
+  push:
+    branches:
+      - main
+    paths:
+      - '**.py'
+      - 'requirements.txt'
+      - '.github/workflows/version-check.yml'
+
+jobs:
+  check-versions:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run version check
+        env:
+          # Claude Code 通知配置
+          CLAUDE_CODE_BOT_TOKEN: ${{ secrets.CLAUDE_CODE_BOT_TOKEN }}
+          CLAUDE_CODE_CHAT_ID: ${{ secrets.CLAUDE_CODE_CHAT_ID }}
+          # OpenAI Codex 通知配置
+          CODEX_BOT_TOKEN: ${{ secrets.CODEX_BOT_TOKEN }}
+          CODEX_CHAT_ID: ${{ secrets.CODEX_CHAT_ID }}
+          # AI 翻译配置
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          TRANSLATE_MODEL: ${{ vars.TRANSLATE_MODEL }}
+        run: python main.py
+
+      - name: Commit version updates
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add -A
+          # 检查是否有变更需要提交
+          if git diff --staged --quiet; then
+            echo "No version updates detected"
+          else
+            git commit -m "chore: update version records [skip ci]"
+            git push
+          fi
