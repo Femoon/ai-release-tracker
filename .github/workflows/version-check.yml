@@ -10,14 +10,6 @@ on:
     - cron: '*/30 * * * *'
   # 手动触发
   workflow_dispatch:
-  # 推送到 main 分支时触发（可选，用于测试）
-  push:
-    branches:
-      - main
-    paths:
-      - '**.py'
-      - 'requirements.txt'
-      - '.github/workflows/version-check.yml'
 
 jobs:
   check-versions:
