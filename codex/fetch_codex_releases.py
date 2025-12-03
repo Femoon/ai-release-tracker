@@ -50,11 +50,18 @@ def clean_body(body):
     if not body:
         return ""
 
-    # 移除 PRs Merged / Merged PRs / PRs 部分及后面所有内容
-    clean = re.sub(r'\n##\s*PRs?\s*Merged.*', '', body, flags=re.DOTALL | re.IGNORECASE)
-    clean = re.sub(r'\n###\s*PRs?\s*Merged.*', '', clean, flags=re.DOTALL | re.IGNORECASE)
-    clean = re.sub(r'\n##\s*Merged\s*PRs?.*', '', clean, flags=re.DOTALL | re.IGNORECASE)
-    clean = re.sub(r'\n###\s*PRs?\s*$.*', '', clean, flags=re.DOTALL | re.IGNORECASE)  # ### PRs
+    # 移除各种 PR 列表标题及后面所有内容
+    patterns = [
+        r'\n[-#]*\s*Full list of merged PRs.*',
+        r'\n[-#]*\s*Merged PRs.*',
+        r'\n[-#]*\s*All merged PRs.*',
+        r'\n[-#]*\s*List of merged PRs.*',
+        r'\n[-#]*\s*PRs Merged.*',
+        r'\n#+\s*PRs\s*\n.*',  # ### PRs 后跟换行
+    ]
+    clean = body
+    for pattern in patterns:
+        clean = re.sub(pattern, '', clean, flags=re.DOTALL | re.IGNORECASE)
 
     # 移除 Full Changelog 行
     clean = re.sub(r'\*?\*?Full Changelog\*?\*?:?.*', '', clean, flags=re.IGNORECASE)
@@ -62,11 +69,12 @@ def clean_body(body):
     # 移除 PR 列表行（各种格式）
     clean = re.sub(r'^[-*]\s+.*(?:by @|— @).*(?:in #\d+|#\d+).*$', '', clean, flags=re.MULTILINE)
     clean = re.sub(r'^[-*]\s+.*\(#\d+\)\s*—\s*@.*$', '', clean, flags=re.MULTILINE)
-    clean = re.sub(r'^#\d+\s+[–—-]\s+.*$', '', clean, flags=re.MULTILINE)  # #5897 – xxx 格式
+    clean = re.sub(r'^#\d+\s+[–—-]\s+.*$', '', clean, flags=re.MULTILINE)
+    clean = re.sub(r'^[-*]\s+PR\s*$', '', clean, flags=re.MULTILINE)  # 单独的 "- PR" 行
 
     # 移除内联的 PR/Issue 引用（如 #6222, (#6189)）
-    clean = re.sub(r'\s*\(#\d+(?:\s+#\d+)*\)', '', clean)  # (#6189) 或 (#6406 #6517)
-    clean = re.sub(r'#\d+(?:\s+#\d+)*', '', clean)  # #6222 #6189
+    clean = re.sub(r'\s*\(#\d+(?:\s+#\d+)*\)', '', clean)
+    clean = re.sub(r'#\d+(?:\s+#\d+)*', '', clean)
 
     # 移除 PR/Issue 链接
     clean = re.sub(r'https://github\.com/openai/codex/pull/\d+', '', clean)

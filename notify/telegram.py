@@ -26,11 +26,11 @@ def escape_markdown(text: str) -> str:
 
 
 def process_message_for_markdown_v2(text: str) -> str:
-    """处理消息，保留粗体标记和超链接，转义其他特殊字符"""
+    """处理消息，保留粗体标记、超链接和代码块，转义其他特殊字符"""
     # 先提取并保护超链接 [text](url)
     link_pattern = r'\[([^\]]+)\]\(([^)]+)\)'
     links = []
-    link_placeholder = "\x00LINK{}\x00"  # 使用不可见字符作为占位符
+    link_placeholder = "\x00LINK{}\x00"
 
     def save_link(match):
         idx = len(links)
@@ -38,6 +38,18 @@ def process_message_for_markdown_v2(text: str) -> str:
         return link_placeholder.format(idx)
 
     text = re.sub(link_pattern, save_link, text)
+
+    # 提取并保护代码块 `code`
+    code_pattern = r'`([^`]+)`'
+    codes = []
+    code_placeholder = "\x01CODE{}\x01"
+
+    def save_code(match):
+        idx = len(codes)
+        codes.append(match.group(1))
+        return code_placeholder.format(idx)
+
+    text = re.sub(code_pattern, save_code, text)
 
     # 处理粗体
     bold_pattern = r'\*([^*]+)\*'
@@ -48,7 +60,6 @@ def process_message_for_markdown_v2(text: str) -> str:
         before_text = text[last_end:match.start()]
         parts.append(escape_markdown(before_text))
         bold_content = match.group(1)
-        # 不转义粗体内容中的占位符
         escaped_bold = escape_markdown(bold_content)
         parts.append(f'*{escaped_bold}*')
         last_end = match.end()
@@ -56,11 +67,17 @@ def process_message_for_markdown_v2(text: str) -> str:
     parts.append(escape_markdown(text[last_end:]))
     result = ''.join(parts)
 
-    # 恢复超链接（链接文本需要转义，URL 不需要）
+    # 恢复超链接
     for idx, (link_text, link_url) in enumerate(links):
         escaped_text = escape_markdown(link_text)
         placeholder = escape_markdown(link_placeholder.format(idx))
         result = result.replace(placeholder, f'[{escaped_text}]({link_url})')
+
+    # 恢复代码块（代码内容需要转义特殊字符，但保留反引号格式）
+    for idx, code_content in enumerate(codes):
+        escaped_code = escape_markdown(code_content)
+        placeholder = escape_markdown(code_placeholder.format(idx))
+        result = result.replace(placeholder, f'`{escaped_code}`')
 
     return result
 
