@@ -91,6 +91,18 @@ export TRANSLATE_MODEL="openrouter/google/gemini-2.5-flash"
 
 未配置时跳过翻译，仅发送英文原文。
 
+## GitHub API 配置（可选）
+
+仅 `products/codex/fetcher.py` 使用 GitHub API 获取 releases 信息，可配置 Token 避免速率限制：
+
+```bash
+export GITHUB_TOKEN="your_github_token"
+```
+
+未配置时脚本仍可运行，但可能遇到速率限制（60 次/小时）。配置后提升至 5000 次/小时。
+
+Token 获取方式：GitHub Settings → Developer settings → Personal access tokens → 创建 token（无需特殊权限，public_repo 访问即可）。
+
 ## Docker 部署
 
 ### 构建镜像
@@ -132,6 +144,9 @@ CODEX_CHAT_ID=your_codex_chat_id
 
 # AI 翻译配置
 OPENROUTER_API_KEY=your_openrouter_api_key
+
+# GitHub API 配置（可选，仅 codex/fetcher.py 使用）
+# GITHUB_TOKEN=your_github_token
 ```
 
 docker-compose 会自动读取 `.env` 文件。
