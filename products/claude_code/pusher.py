@@ -17,14 +17,14 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # 添加项目根目录到路径
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from notify.telegram import send_bilingual_notification
-from translate import translate_changelog
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from core.notify.telegram import send_bilingual_notification
+from core.translate import translate_changelog
 
 # 配置
 CHANGELOG_URL = "https://raw.githubusercontent.com/anthropics/claude-code/refs/heads/main/CHANGELOG.md"
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
+PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
 PUSHED_VERSIONS_FILE = os.path.join(PROJECT_ROOT, "output", "claude_code_pushed_versions.txt")
 
 # Telegram 配置（独立环境变量）
@@ -51,43 +51,36 @@ def fetch_changelog():
 def parse_all_versions(changelog_text):
     """
     解析所有版本号和更新内容
-    返回: [(版本号, 更新内容), ...] 按时间从早到新排序
+    返回: [(version, content), ...]，从旧到新排序
     """
     version_pattern = r'^## (\d+\.\d+\.\d+)'
-
     lines = changelog_text.split('\n')
+
     versions = []
     current_version = None
-    content_lines = []
+    current_lines = []
 
     for line in lines:
         match = re.match(version_pattern, line)
         if match:
-            # 保存前一个版本（如果有）
+            # 保存上一个版本
             if current_version:
-                # 清理尾部空行
-                while content_lines and not content_lines[-1].strip():
-                    content_lines.pop()
-                content = '\n'.join(content_lines)
+                content = '\n'.join(current_lines).strip()
                 versions.append((current_version, content))
 
             # 开始新版本
             current_version = match.group(1)
-            content_lines = [line]
+            current_lines = [line]
         elif current_version:
-            content_lines.append(line)
+            current_lines.append(line)
 
     # 保存最后一个版本
     if current_version:
-        while content_lines and not content_lines[-1].strip():
-            content_lines.pop()
-        content = '\n'.join(content_lines)
+        content = '\n'.join(current_lines).strip()
         versions.append((current_version, content))
 
-    # 反转列表，从早到新
-    versions.reverse()
-
-    return versions
+    # 返回从旧到新的顺序（反转列表）
+    return list(reversed(versions))
 
 
 def read_pushed_versions():
@@ -125,14 +118,13 @@ def main(max_count=3, push_all=False):
     print("Claude Code 历史版本批量推送")
     print("=" * 50)
 
-    # 获取 CHANGELOG
+    # 获取所有版本
     changelog = fetch_changelog()
     if not changelog:
         return
 
-    # 解析所有版本
     all_versions = parse_all_versions(changelog)
-    print(f"解析到 {len(all_versions)} 个版本")
+    print(f"共 {len(all_versions)} 个版本")
 
     # 读取已推送版本
     pushed_versions = read_pushed_versions()

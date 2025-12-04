@@ -5,7 +5,6 @@
 """
 
 import os
-import re
 from litellm import completion
 
 
@@ -59,52 +58,3 @@ def translate_changelog(
     except Exception as e:
         print(f"翻译失败: {e}")
         return ""
-
-
-def format_bilingual(
-    version: str,
-    original: str,
-    translated: str,
-    title: str = ""
-) -> str:
-    """
-    格式化双语内容（Markdown 格式，适用于 Telegram）
-
-    Args:
-        version: 版本号
-        original: 英文原文
-        translated: 中文翻译
-        title: 标题（如 "Claude Code" 或 "OpenAI Codex"）
-
-    Returns:
-        str: 格式化后的双语内容（Markdown）
-    """
-    def clean_for_telegram(text, remove_version=False):
-        """清理内容，移除 Telegram 不支持的 Markdown 语法"""
-        # 移除 ## 标题标记
-        text = re.sub(r'^#{1,6}\s*', '', text, flags=re.MULTILINE)
-        # 移除版本号行（如单独的 "2.0.56" 行）
-        if remove_version:
-            text = re.sub(r'^\d+\.\d+\.\d+\s*$', '', text, flags=re.MULTILINE)
-        # 替换列表符号 "- " 为 "• "
-        text = re.sub(r'^- ', '• ', text, flags=re.MULTILINE)
-        # 清理多余空行
-        text = re.sub(r'\n{3,}', '\n\n', text)
-        return text.strip()
-
-    original_clean = clean_for_telegram(original, remove_version=True)
-    translated_clean = clean_for_telegram(translated, remove_version=True) if translated else ""
-
-    lines = []
-
-    if title:
-        lines.append(f"*{title} {version} Released*")
-        lines.append("")
-
-    lines.append(original_clean)
-
-    if translated_clean:
-        lines.append("")
-        lines.append(translated_clean)
-
-    return "\n".join(lines)

@@ -14,11 +14,11 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CHECKERS = [
     {
         "name": "Claude Code",
-        "script": os.path.join(SCRIPT_DIR, "claude_code", "claude_code_version_check.py"),
+        "script": os.path.join(SCRIPT_DIR, "products", "claude_code", "checker.py"),
     },
     {
         "name": "OpenAI Codex",
-        "script": os.path.join(SCRIPT_DIR, "codex", "codex_version_check.py"),
+        "script": os.path.join(SCRIPT_DIR, "products", "codex", "checker.py"),
     },
 ]
 

@@ -15,10 +15,10 @@ AI 编码工具版本更新监控工具。自动检查新版本发布，并发�
 
 ## 支持的工具
 
-| 工具 | 数据源 | 版本记录文件 |
-|------|--------|--------------|
-| Claude Code | GitHub CHANGELOG.md | output/claude_code_latest_version.txt |
-| OpenAI Codex | GitHub releases Atom feed | output/codex_latest_version.txt |
+| 工具 | 脚本 | 数据源 |
+|------|------|--------|
+| Claude Code | products/claude_code/checker.py | GitHub CHANGELOG.md |
+| OpenAI Codex | products/codex/checker.py | GitHub releases Atom feed |
 
 ## 快速开始
 
@@ -37,15 +37,21 @@ pip install -r requirements.txt
 python main.py
 
 # 单独检查 Claude Code
-python claude_code/claude_code_version_check.py
+python products/claude_code/checker.py
 
 # 单独检查 OpenAI Codex（排除 alpha 版本）
-python codex/codex_version_check.py
+python products/codex/checker.py
 
 # 批量推送 Claude Code 历史版本到 Telegram
-python claude_code/claude_code_history_push.py              # 推送 3 个版本（默认）
-python claude_code/claude_code_history_push.py --count 5    # 推送 5 个版本
-python claude_code/claude_code_history_push.py --all        # 推送所有未推送版本
+python products/claude_code/pusher.py              # 推送 3 个版本（默认）
+python products/claude_code/pusher.py --count 5    # 推送 5 个版本
+python products/claude_code/pusher.py --all        # 推送所有未推送版本
+
+# 批量推送 OpenAI Codex 历史版本到 Telegram
+python products/codex/pusher.py
+
+# 获取 OpenAI Codex 所有 releases 信息
+python products/codex/fetcher.py
 ```
 
 ## 配置

@@ -15,10 +15,10 @@ A monitoring tool for tracking version updates of AI coding tools. Automatically
 
 ## Supported Tools
 
-| Tool | Data Source | Version File |
-|------|-------------|--------------|
-| Claude Code | GitHub CHANGELOG.md | output/claude_code_latest_version.txt |
-| OpenAI Codex | GitHub releases Atom feed | output/codex_latest_version.txt |
+| Tool | Script | Data Source |
+|------|--------|-------------|
+| Claude Code | products/claude_code/checker.py | GitHub CHANGELOG.md |
+| OpenAI Codex | products/codex/checker.py | GitHub releases Atom feed |
 
 ## Quick Start
 
@@ -37,15 +37,21 @@ pip install -r requirements.txt
 python main.py
 
 # Check Claude Code only
-python claude_code/claude_code_version_check.py
+python products/claude_code/checker.py
 
 # Check OpenAI Codex only (excludes alpha versions)
-python codex/codex_version_check.py
+python products/codex/checker.py
 
 # Batch push Claude Code historical versions to Telegram
-python claude_code/claude_code_history_push.py              # Push 3 versions (default)
-python claude_code/claude_code_history_push.py --count 5    # Push 5 versions
-python claude_code/claude_code_history_push.py --all        # Push all unpushed versions
+python products/claude_code/pusher.py              # Push 3 versions (default)
+python products/claude_code/pusher.py --count 5    # Push 5 versions
+python products/claude_code/pusher.py --all        # Push all unpushed versions
+
+# Batch push OpenAI Codex historical versions to Telegram
+python products/codex/pusher.py
+
+# Fetch all OpenAI Codex releases
+python products/codex/fetcher.py
 ```
 
 ## Configuration

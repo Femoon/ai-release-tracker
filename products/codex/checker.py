@@ -16,14 +16,14 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # 添加项目根目录到路径
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from notify.telegram import send_bilingual_notification
-from translate import translate_changelog
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from core.notify.telegram import send_bilingual_notification
+from core.translate import translate_changelog
 
 # 配置
 RELEASES_ATOM_URL = "https://github.com/openai/codex/releases.atom"
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
+PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
 VERSION_FILE = os.path.join(PROJECT_ROOT, "output", "codex_latest_version.txt")
 
 # Telegram 配置（独立环境变量）

@@ -13,15 +13,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 python main.py
 
 # 单独检查 Claude Code 版本更新
-python claude_code/claude_code_version_check.py
+python products/claude_code/checker.py
 
 # 单独检查 OpenAI Codex 版本更新（排除 alpha 版本）
-python codex/codex_version_check.py
+python products/codex/checker.py
 
 # 批量推送 Claude Code 历史版本到 Telegram（默认推送 3 个）
-python claude_code/claude_code_history_push.py
-python claude_code/claude_code_history_push.py --count 5  # 推送 5 个
-python claude_code/claude_code_history_push.py --all       # 推送所有未推送版本
+python products/claude_code/pusher.py
+python products/claude_code/pusher.py --count 5  # 推送 5 个
+python products/claude_code/pusher.py --all       # 推送所有未推送版本
+
+# 批量推送 OpenAI Codex 历史版本到 Telegram
+python products/codex/pusher.py
+
+# 获取 OpenAI Codex 所有 releases 信息
+python products/codex/fetcher.py
 ```
 
 ## 依赖
@@ -44,10 +50,10 @@ pip install requests python-dotenv litellm
 
 | 脚本 | 数据源 | 版本记录文件 |
 |------|--------|--------------|
-| claude_code/claude_code_version_check.py | GitHub CHANGELOG.md | output/claude_code_latest_version.txt |
-| codex/codex_version_check.py | GitHub releases Atom feed | output/codex_latest_version.txt |
+| products/claude_code/checker.py | GitHub CHANGELOG.md | output/claude_code_latest_version.txt |
+| products/codex/checker.py | GitHub releases Atom feed | output/codex_latest_version.txt |
 
-历史推送脚本 `claude_code_history_push.py` 会记录已推送版本到 `output/claude_code_pushed_versions.txt`，避免重复推送。
+历史推送脚本 `products/claude_code/pusher.py` 会记录已推送版本到 `output/claude_code_pushed_versions.txt`，避免重复推送。
 
 ## GitHub Actions
 

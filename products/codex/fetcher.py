@@ -13,7 +13,11 @@ load_dotenv()
 
 RELEASES_API_URL = "https://api.github.com/repos/openai/codex/releases"
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
-OUTPUT_FILE = "output/codex_releases.txt"
+
+# 获取项目根目录
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
+OUTPUT_FILE = os.path.join(PROJECT_ROOT, "output", "codex_releases.txt")
 
 
 def fetch_all_releases():

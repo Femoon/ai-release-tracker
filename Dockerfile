@@ -8,10 +8,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # 复制项目文件
 COPY main.py .
-COPY notify/ ./notify/
-COPY translate/ ./translate/
-COPY claude_code/ ./claude_code/
-COPY codex/ ./codex/
+COPY core/ ./core/
+COPY products/ ./products/
 
 # 版本文件通过 volume 挂载
 RUN mkdir -p /app/output

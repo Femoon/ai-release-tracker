@@ -16,13 +16,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # 添加项目根目录到路径
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from notify.telegram import send_bilingual_notification
-from translate import translate_changelog
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from core.notify.telegram import send_bilingual_notification
+from core.translate import translate_changelog
 
 # 配置
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
+PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
 RELEASES_FILE = os.path.join(PROJECT_ROOT, "output", "codex_releases.txt")
 PUSHED_VERSIONS_FILE = os.path.join(PROJECT_ROOT, "output", "codex_pushed_versions.txt")
 
