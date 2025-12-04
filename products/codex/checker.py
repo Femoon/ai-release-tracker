@@ -172,19 +172,15 @@ def main():
 
         # 发送 Telegram 通知
         original_content = latest_content or "（暂无更新说明）"
-        content_to_translate = latest_content or ""
-        if release_link:
-            link_text = f"链接: {release_link}\n\n"
-            original_content = link_text + original_content
-            content_to_translate = link_text + content_to_translate if content_to_translate else ""
-        translated = translate_changelog(content_to_translate) if content_to_translate else ""
+        translated = translate_changelog(latest_content) if latest_content else ""
         send_bilingual_notification(
             version=latest_version,
             original=original_content,
             translated=translated,
             title="OpenAI Codex",
             bot_token=TELEGRAM_BOT_TOKEN,
-            chat_id=TELEGRAM_CHAT_ID
+            chat_id=TELEGRAM_CHAT_ID,
+            version_url=release_link
         )
 
 
