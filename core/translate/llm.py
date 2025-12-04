@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-翻译模块 - 使用 LiteLLM 调用 OpenRouter 进行翻译
+翻译模块 - 使用 LiteLLM 调用 LLM API 进行翻译
 """
 
 import os
@@ -18,14 +18,14 @@ def translate_changelog(
 
     Args:
         content: 要翻译的英文内容
-        model: 模型名称，默认使用环境变量 TRANSLATE_MODEL 或 openrouter/google/gemini-2.5-flash
-        api_key: API Key，默认使用环境变量 OPENROUTER_API_KEY
+        model: 模型名称，默认使用环境变量 LLM_MODEL 或 openrouter/google/gemini-2.5-flash
+        api_key: API Key，默认使用环境变量 LLM_API_KEY
 
     Returns:
         str: 翻译后的中文内容，失败时返回空字符串
     """
-    model = model or os.getenv("TRANSLATE_MODEL", "openrouter/google/gemini-2.5-flash")
-    api_key = api_key or os.getenv("OPENROUTER_API_KEY", "")
+    model = model or os.getenv("LLM_MODEL", "openrouter/google/gemini-2.5-flash")
+    api_key = api_key or os.getenv("LLM_API_KEY", "")
 
     if not api_key:
         print("翻译配置未设置，跳过翻译")

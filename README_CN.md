@@ -8,7 +8,7 @@ AI 编码工具版本更新监控工具。自动检查新版本发布，并发�
 
 - 监控多个 AI 编码工具的版本更新
 - 从 GitHub 解析更新日志（CHANGELOG.md 或 Atom feed）
-- 使用 OpenRouter/Gemini 进行 AI 翻译
+- 使用 LiteLLM 进行 AI 翻译（支持多种 provider）
 - 双语 Telegram 通知
 - GitHub Actions 每 30 分钟自动检查
 - 支持 Docker 部署
@@ -74,13 +74,13 @@ export CODEX_CHAT_ID="your_chat_id"
 
 ### AI 翻译
 
-使用 OpenRouter 调用 Gemini 进行更新内容翻译：
+使用 LiteLLM 进行更新内容翻译（支持多种 provider）：
 
 ```bash
-export OPENROUTER_API_KEY="your_openrouter_api_key"
+export LLM_API_KEY="your_llm_api_key"
 
 # 可选：指定翻译模型，默认 openrouter/google/gemini-2.5-flash
-export TRANSLATE_MODEL="openrouter/google/gemini-2.5-flash"
+export LLM_MODEL="openrouter/google/gemini-2.5-flash"
 ```
 
 未配置时跳过翻译，仅发送英文原文。
@@ -91,7 +91,7 @@ export TRANSLATE_MODEL="openrouter/google/gemini-2.5-flash"
 
 - 每 30 分钟自动运行
 - 检测到新版本时自动提交版本记录更新
-- 需配置 Repository Secrets：`CLAUDE_CODE_BOT_TOKEN`、`CLAUDE_CODE_CHAT_ID`、`CODEX_BOT_TOKEN`、`CODEX_CHAT_ID`、`OPENROUTER_API_KEY`
+- 需配置 Repository Secrets：`CLAUDE_CODE_BOT_TOKEN`、`CLAUDE_CODE_CHAT_ID`、`CODEX_BOT_TOKEN`、`CODEX_CHAT_ID`、`LLM_API_KEY`
 
 ## Docker 部署
 
@@ -133,7 +133,7 @@ CODEX_BOT_TOKEN=your_bot_token
 CODEX_CHAT_ID=your_chat_id
 
 # AI 翻译
-OPENROUTER_API_KEY=your_openrouter_api_key
+LLM_API_KEY=your_llm_api_key
 ```
 
 docker-compose 会自动读取 `.env` 文件。
@@ -144,7 +144,7 @@ docker-compose 会自动读取 `.env` 文件。
 2. 解析最新版本号和更新内容
 3. 与本地 `output/*_latest_version.txt` 对比
 4. 版本变化时打印更新内容并更新本地记录
-5. 使用 AI 翻译更新内容（通过 LiteLLM + OpenRouter）
+5. 使用 AI 翻译更新内容（通过 LiteLLM）
 6. 发送双语 Telegram 通知
 
 ## 许可证

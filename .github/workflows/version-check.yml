@@ -46,8 +46,8 @@ jobs:
           CODEX_BOT_TOKEN: ${{ secrets.CODEX_BOT_TOKEN }}
           CODEX_CHAT_ID: ${{ secrets.CODEX_CHAT_ID }}
           # AI 翻译配置
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          TRANSLATE_MODEL: ${{ vars.TRANSLATE_MODEL }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_MODEL: ${{ vars.LLM_MODEL }}
         run: uv run python main.py
 
       - name: Commit version updates

@@ -45,7 +45,7 @@ pip install requests python-dotenv litellm
 2. 解析最新版本号和更新内容
 3. 与本地 `output/*_latest_version.txt` 对比
 4. 版本变化时打印更新内容并更新本地记录
-5. 使用 AI 翻译更新内容（通过 LiteLLM 调用 OpenRouter）
+5. 使用 AI 翻译更新内容（通过 LiteLLM 调用 LLM API）
 6. 发送双语 Telegram 通知（英文原文 + 中文翻译）
 
 | 脚本 | 数据源 | 版本记录文件 |
@@ -60,7 +60,7 @@ pip install requests python-dotenv litellm
 项目配置了自动版本检查（`.github/workflows/version-check.yml`）：
 - 每 30 分钟自动运行
 - 检测到新版本时自动提交版本记录更新
-- 需配置 Repository Secrets: `CLAUDE_CODE_BOT_TOKEN`, `CLAUDE_CODE_CHAT_ID`, `CODEX_BOT_TOKEN`, `CODEX_CHAT_ID`, `OPENROUTER_API_KEY`
+- 需配置 Repository Secrets: `CLAUDE_CODE_BOT_TOKEN`, `CLAUDE_CODE_CHAT_ID`, `CODEX_BOT_TOKEN`, `CODEX_CHAT_ID`, `LLM_API_KEY`
 
 ## Telegram 通知配置
 
@@ -80,13 +80,13 @@ export CODEX_CHAT_ID="your_codex_chat_id"
 
 ## AI 翻译配置
 
-使用 OpenRouter 调用 Gemini 进行更新内容翻译，通知会显示英文原文和中文翻译：
+使用 LiteLLM 调用 LLM API 进行更新内容翻译，通知会显示英文原文和中文翻译：
 
 ```bash
-export OPENROUTER_API_KEY="your_openrouter_api_key"
+export LLM_API_KEY="your_llm_api_key"
 
 # 可选：指定翻译模型，默认 openrouter/google/gemini-2.5-flash
-export TRANSLATE_MODEL="openrouter/google/gemini-2.5-flash"
+export LLM_MODEL="openrouter/google/gemini-2.5-flash"
 ```
 
 未配置时跳过翻译，仅发送英文原文。
@@ -143,7 +143,7 @@ CODEX_BOT_TOKEN=your_codex_bot_token
 CODEX_CHAT_ID=your_codex_chat_id
 
 # AI 翻译配置
-OPENROUTER_API_KEY=your_openrouter_api_key
+LLM_API_KEY=your_llm_api_key
 
 # GitHub API 配置（可选，仅 codex/fetcher.py 使用）
 # GITHUB_TOKEN=your_github_token

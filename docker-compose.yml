@@ -8,8 +8,8 @@ services:
       - CLAUDE_CODE_CHAT_ID=${CLAUDE_CODE_CHAT_ID:-}
       - CODEX_BOT_TOKEN=${CODEX_BOT_TOKEN:-}
       - CODEX_CHAT_ID=${CODEX_CHAT_ID:-}
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
-      - TRANSLATE_MODEL=${TRANSLATE_MODEL:-}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_MODEL=${LLM_MODEL:-}
     volumes:
       - ./output:/app/output
     restart: "no"

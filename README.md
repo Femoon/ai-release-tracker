@@ -8,7 +8,7 @@ A monitoring tool for tracking version updates of AI coding tools. Automatically
 
 - Monitor multiple AI coding tools for version updates
 - Parse changelogs from GitHub (CHANGELOG.md or Atom feed)
-- AI-powered translation using OpenRouter/Gemini
+- AI-powered translation using LiteLLM (supports multiple providers)
 - Bilingual Telegram notifications
 - GitHub Actions for automated checking every 30 minutes
 - Docker support for self-hosting
@@ -74,13 +74,13 @@ Scripts run normally without configuration, just skip notifications.
 
 ### AI Translation
 
-Uses OpenRouter to call Gemini for changelog translation:
+Uses LiteLLM for changelog translation (supports multiple providers):
 
 ```bash
-export OPENROUTER_API_KEY="your_openrouter_api_key"
+export LLM_API_KEY="your_llm_api_key"
 
 # Optional: specify translation model (default: openrouter/google/gemini-2.5-flash)
-export TRANSLATE_MODEL="openrouter/google/gemini-2.5-flash"
+export LLM_MODEL="openrouter/google/gemini-2.5-flash"
 ```
 
 Without configuration, only English content is sent.
@@ -91,7 +91,7 @@ The project includes automated version checking (`.github/workflows/version-chec
 
 - Runs every 30 minutes
 - Automatically commits version record updates
-- Required secrets: `CLAUDE_CODE_BOT_TOKEN`, `CLAUDE_CODE_CHAT_ID`, `CODEX_BOT_TOKEN`, `CODEX_CHAT_ID`, `OPENROUTER_API_KEY`
+- Required secrets: `CLAUDE_CODE_BOT_TOKEN`, `CLAUDE_CODE_CHAT_ID`, `CODEX_BOT_TOKEN`, `CODEX_CHAT_ID`, `LLM_API_KEY`
 
 ## Docker Deployment
 
@@ -131,7 +131,7 @@ CODEX_BOT_TOKEN=your_bot_token
 CODEX_CHAT_ID=your_chat_id
 
 # AI Translation
-OPENROUTER_API_KEY=your_openrouter_api_key
+LLM_API_KEY=your_llm_api_key
 ```
 
 ## How It Works
@@ -140,7 +140,7 @@ OPENROUTER_API_KEY=your_openrouter_api_key
 2. Parse latest version number and changelog content
 3. Compare with local `output/*_latest_version.txt`
 4. If version changed, print changelog and update local record
-5. Translate content using AI (via LiteLLM + OpenRouter)
+5. Translate content using AI (via LiteLLM)
 6. Send bilingual Telegram notification
 
 ## License
