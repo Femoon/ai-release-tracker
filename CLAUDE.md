@@ -126,7 +126,7 @@ docker compose run --rm version-checker
 crontab -e
 
 # 每小时检查一次
-0 * * * * cd /path/to/version-push && docker compose run --rm version-checker >> /var/log/version-push.log 2>&1
+0 * * * * cd /path/to/ai-release-tracker && docker compose run --rm version-checker >> /var/log/ai-release-tracker.log 2>&1
 ```
 
 ### 配置 Telegram 通知

@@ -1,4 +1,4 @@
-# Version Push
+# AI Release Tracker
 
 AI 编码工具版本更新监控工具。自动检查新版本发布，并发送双语通知（英文 + 中文）到 Telegram。
 
@@ -25,8 +25,8 @@ AI 编码工具版本更新监控工具。自动检查新版本发布，并发�
 ### 安装
 
 ```bash
-git clone https://github.com/your-username/version-push.git
-cd version-push
+git clone https://github.com/your-username/ai-release-tracker.git
+cd ai-release-tracker
 pip install -r requirements.txt
 ```
 
@@ -116,7 +116,7 @@ docker compose run --rm version-checker
 crontab -e
 
 # 每小时检查一次
-0 * * * * cd /path/to/version-push && docker compose run --rm version-checker >> /var/log/version-push.log 2>&1
+0 * * * * cd /path/to/ai-release-tracker && docker compose run --rm version-checker >> /var/log/ai-release-tracker.log 2>&1
 ```
 
 ### 环境变量配置

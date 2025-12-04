@@ -1,4 +1,4 @@
-# Version Push
+# AI Release Tracker
 
 A monitoring tool for tracking version updates of AI coding tools. Automatically checks for new releases and sends bilingual notifications (English + Chinese) to Telegram.
 
@@ -25,8 +25,8 @@ A monitoring tool for tracking version updates of AI coding tools. Automatically
 ### Installation
 
 ```bash
-git clone https://github.com/your-username/version-push.git
-cd version-push
+git clone https://github.com/your-username/ai-release-tracker.git
+cd ai-release-tracker
 pip install -r requirements.txt
 ```
 
@@ -114,7 +114,7 @@ docker compose run --rm version-checker
 crontab -e
 
 # Check every hour
-0 * * * * cd /path/to/version-push && docker compose run --rm version-checker >> /var/log/version-push.log 2>&1
+0 * * * * cd /path/to/ai-release-tracker && docker compose run --rm version-checker >> /var/log/ai-release-tracker.log 2>&1
 ```
 
 ### Environment Variables
