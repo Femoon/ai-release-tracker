@@ -19,6 +19,7 @@ load_dotenv()
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from core.notify.telegram import send_bilingual_notification
 from core.translate import translate_changelog
+from core.utils import clean_release_body
 
 # 配置
 RELEASES_ATOM_URL = "https://github.com/openai/codex/releases.atom"
@@ -83,22 +84,16 @@ def parse_latest_stable_release(feed_xml):
 
 
 def clean_html_content(html_text):
-    """清理 HTML 标签，提取纯文本"""
-    # 移除 HTML 标签
-    clean = re.sub(r'<[^>]+>', '', html_text)
+    """清理 HTML 标签，提取纯文本，然后调用共享清理函数"""
+    # 将 <li> 标签转换为换行+列表符号（使用 ASCII 字符兼容 Windows GBK 终端）
+    clean = re.sub(r'<li[^>]*>', '\n- ', html_text)
+    # 移除其他 HTML 标签
+    clean = re.sub(r'<[^>]+>', '', clean)
     # 处理 HTML 实体
     clean = clean.replace('&lt;', '<').replace('&gt;', '>').replace('&amp;', '&')
     clean = clean.replace('&quot;', '"').replace('&#39;', "'")
-    # 过滤掉 "Full Changelog:" 行
-    lines = clean.split('\n')
-    lines = [line for line in lines if not line.strip().startswith('Full Changelog:')]
-    clean = '\n'.join(lines)
-    # 移除 PRs Merged 部分（太长，会超出 Telegram 4096 字符限制）
-    prs_merged_pattern = r'\n\s*PRs Merged\s*\n.*'
-    clean = re.sub(prs_merged_pattern, '', clean, flags=re.DOTALL)
-    # 清理多余空白
-    clean = re.sub(r'\n\s*\n', '\n\n', clean)
-    return clean.strip()
+    # 调用共享清理函数进行进一步处理
+    return clean_release_body(clean)
 
 
 def read_saved_version():

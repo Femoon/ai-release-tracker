@@ -30,10 +30,15 @@ def run_checker(checker):
     print("=" * 50)
 
     try:
+        # 设置子进程使用 UTF-8 编码
+        env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
         result = subprocess.run(
             [sys.executable, checker["script"]],
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            env=env,
         )
         # 输出子进程的标准输出
         if result.stdout:

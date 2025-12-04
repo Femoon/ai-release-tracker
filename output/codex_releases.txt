@@ -1,8 +1,7 @@
 ## [0.3.0](https://github.com/openai/codex/releases/tag/rust-v0.3.0)
 
 This addresses a number of important issues reported in 0.2.0
-- Fixes an issue where non-ASCII characters were crashing the CLI: (huge thanks to @ryozi-tn for the fix)
-
+- Fixes an issue where non-ASCII characters were crashing the CLI: (huge thanks to [@ryozi-tn](https://github.com/ryozi-tn) for the fix)
 - Adds support for a `--sandbox` flag and makes some breaking changes to `config.toml` around this option. 
 - Makes it possible to configure custom HTTP headers when making requests to model providers
 
@@ -19,9 +18,9 @@ This addresses a number of important issues reported in 0.2.0
 ## [0.5.0](https://github.com/openai/codex/releases/tag/rust-v0.5.0)
 
 * Added new config option: `model_supports_reasoning_summaries`
-* Thanks to @reneleonhardt for helping update a number of our dependencies (we now build with Rust 1.88!)
+* Thanks to [@reneleonhardt](https://github.com/reneleonhardt) for helping update a number of our dependencies (we now build with Rust 1.88!)
 * Removed reference to `/compact` because it is not supported yet
-* Thanks to @pchuri so that when running Codex installed via `npm`, `process.platform === "android"` will run the Rust CLI
+* Thanks to [@pchuri](https://github.com/pchuri) so that when running Codex installed via `npm`, `process.platform === "android"` will run the Rust CLI
 * Fix generated shell completions to use the name `codex` instead of `codex-cli`
 
 ============================================================
@@ -42,28 +41,32 @@ Need to publish a new version on npm.
 
 ## [0.8.0](https://github.com/openai/codex/releases/tag/rust-v0.8.0)
 
-- we now stream the response from the model in the TUI and when using `codex exec`
-
-- changes `ctrl-d` so it only exits the TUI if the composer is empty (it will still exit the TUI if the composer is hidden because the Codex agent is thinking)
-
-- As a heads up, changes the organization of the `~/.codex/sessions` folder so it has `YYYY/MM/DD` subfolders. This should make it easier to find recent sessions and avoid degrading filesystem performance because previously `~/.codex/sessions` could end up with an unbounded number of entries
-
-- fixes a longstanding issue where we failed to handle long MCP tool names gracefully (was the relevant GitHub issue)
-
-- introduced a `--json` flag to `codex exec` so that it prints output as JSONL to stdout
-
-- tries to ensure that when the Codex CLI is launched via the Node.js script in the `npm` version that both the Codex CLI process and Node.js process exit together, though it seems like it is not sufficient to fix that specific problem.
-
+- we now stream the response from the model in the TUI and when using `codex exec`
+- changes `ctrl-d` so it only exits the TUI if the composer is empty (it will still exit the TUI if the composer is hidden because the Codex agent is thinking)
+- As a heads up, changes the organization of the `~/.codex/sessions` folder so it has `YYYY/MM/DD` subfolders. This should make it easier to find recent sessions and avoid degrading filesystem performance because previously `~/.codex/sessions` could end up with an unbounded number of entries
+- fixes a longstanding issue where we failed to handle long MCP tool names gracefully (was the relevant GitHub issue)
+- introduced a `--json` flag to `codex exec` so that it prints output as JSONL to stdout
+- tries to ensure that when the Codex CLI is launched via the Node.js script in the `npm` version that both the Codex CLI process and Node.js process exit together, though it seems like it is not sufficient to fix that specific problem.
 - Though it should make it so that, on Windows, the `npm` version will fall back to the TypeScript version (for now) rather than just crashing
+
+============================================================
+
+## [0.9.0-beta](https://github.com/openai/codex/releases/tag/rust-v0.9.0-beta)
+
+（暂无更新说明）
+
+============================================================
+
+## [0.9.0-beta.1](https://github.com/openai/codex/releases/tag/rust-v0.9.0-beta.1)
+
+（暂无更新说明）
 
 ============================================================
 
 ## [0.9.0](https://github.com/openai/codex/releases/tag/rust-v0.9.0)
 
-- Numerous fixes to `codex mcp`.
-
-- to ensure shell commands spawned by Codex get `SIGTERM` when `codex` is killed (Linux only)
-
+- Numerous fixes to `codex mcp`.
+- to ensure shell commands spawned by Codex get `SIGTERM` when `codex` is killed (Linux only)
 - Do not auto-approve certain flags for ripgrep/`rg`
 
 ============================================================
@@ -71,35 +74,30 @@ Need to publish a new version on npm.
 ## [0.10.0](https://github.com/openai/codex/releases/tag/rust-v0.10.0)
 
 * More commands are "trusted" by default
-* Thanks to @pbezglasny for fixing a UI inconsistency in the TUI header
-* We now record some Git state in the `.jsonl` log due to @vishnu-oai
+* Thanks to [@pbezglasny](https://github.com/pbezglasny) for fixing a UI inconsistency in the TUI header
+* We now record some Git state in the `.jsonl` log due to [@vishnu-oai](https://github.com/vishnu-oai)
 
+============================================================
+
+## [0.11.0-beta.1](https://github.com/openai/codex/releases/tag/rust-v0.11.0-beta.1)
+
+（暂无更新说明）
 
 ============================================================
 
 ## [0.11.0](https://github.com/openai/codex/releases/tag/rust-v0.11.0)
 
-**Big News!!!** This release introduces a new UX where Codex is no longer fullscreen / manages its own scrollback, but "appends to the end" and uses the terminal's native scrolling.
-
-
-
+**Big News!!!** This release introduces a new UX where Codex is no longer fullscreen / manages its own scrollback, but "appends to the end" and uses the terminal's native scrolling.
+
 This fixes some longstanding pain points
-- copy/paste works now
-
-- use the terminal's native scrolling
-
-
-
-But wait, there's more!
-
-
-
-- adds support for the `/compact` command
-
-- introduces an experimental planning tool
-
-- security fix to ensure `apply_patch` is run through the sandbox for the session
-
+- copy/paste works now
+- use the terminal's native scrolling
+
+But wait, there's more!
+
+- adds support for the `/compact` command
+- introduces an experimental planning tool
+- security fix to ensure `apply_patch` is run through the sandbox for the session
 - CLI now checks for new versions and lets you know if you are out of date
 
 ============================================================
@@ -113,8 +111,7 @@ But wait, there's more!
 ## [0.13.0](https://github.com/openai/codex/releases/tag/rust-v0.13.0)
 
 Introduces the `--oss` flag so Codex CLI can be used with the new open-weight models from OpenAI. See
-- https://github.com/openai/gpt-oss
-
+- https://github.com/openai/gpt-oss
 -
 
 ============================================================
@@ -128,10 +125,8 @@ Introduces the `--oss` flag so Codex CLI can be used with the new open-weight mo
 
 ## [0.15.0](https://github.com/openai/codex/releases/tag/rust-v0.15.0)
 
-* `gpt-5` is the default model!
-
-* new `--ask-for-approval on-request` option where the model decides whether to prompt the user (which is somewhat of a balance between the existing `on-failure` and `never`) options
-
+* `gpt-5` is the default model!
+* new `--ask-for-approval on-request` option where the model decides whether to prompt the user (which is somewhat of a balance between the existing `on-failure` and `never`) options
 * new onboarding flow that uses `--sandbox workspace-write and --ask-for-approval on-request` as the configuration when users mark a folder is trusted (recommended default when working in a Git repo)
 
 ============================================================
@@ -152,65 +147,45 @@ Introduces the `--oss` flag so Codex CLI can be used with the new open-weight mo
 ## [0.20.0](https://github.com/openai/codex/releases/tag/rust-v0.20.0)
 
 Some key fixes for Windows
-- the `npm` release of `@openai/codex` now runs the Rust CLI instead of falling back to the old TypeScript CLI (TypeScript code was removed from the repo)
-
+- the `npm` release of `[@openai](https://github.com/openai)/codex` now runs the Rust CLI instead of falling back to the old TypeScript CLI (TypeScript code was removed from the repo)
 - fixes two things for Windows
- - fixes one class of issues with login logic by writing Python program to a temp file instead of long string arg (FYI, we are planning to replace the Python with Rust:)
-
- - ignores `PopKeyboardEnhancementFlags` failure since not all Windows terminals support it
-
+ - fixes one class of issues with login logic by writing Python program to a temp file instead of long string arg (FYI, we are planning to replace the Python with Rust:)
+ - ignores `PopKeyboardEnhancementFlags` failure since not all Windows terminals support it
 - should help/fix the Python certificates issue with `codex login`
 
 ============================================================
 
 ## [0.21.0](https://github.com/openai/codex/releases/tag/rust-v0.21.0)
 
-Fixes abound!
-
-
-
-- send prompt cache key for better caching (should improve token efficiency!)
-
-- split multiline commands to improve readability
-
-- Parse exec commands and format them more nicely in the UI
-
-- recognize `applypatch` command as `apply_patch` command string
-
-- Include output truncation message in tool call results to tell the model when it did not get the full output from a command that it might have expected
-
-- show feedback message after `/compact` command, fixing an issue when no deltas were sent
-
-- show diff preview for `apply_patch`
-
-- add JSON schema sanitization for MCP tools to ensure compatibility with internal JsonSchema enum external contributor: Thanks @yaroslavyaroslav!
+Fixes abound!
+
+- send prompt cache key for better caching (should improve token efficiency!)
+- split multiline commands to improve readability
+- Parse exec commands and format them more nicely in the UI
+- recognize `applypatch` command as `apply_patch` command string
+- Include output truncation message in tool call results to tell the model when it did not get the full output from a command that it might have expected
+- show feedback message after `/compact` command, fixing an issue when no deltas were sent
+- show diff preview for `apply_patch`
+- add JSON schema sanitization for MCP tools to ensure compatibility with internal JsonSchema enum external contributor: Thanks [@yaroslavyaroslav](https://github.com/yaroslavyaroslav)!
 
 ============================================================
 
 ## [0.22.0](https://github.com/openai/codex/releases/tag/rust-v0.22.0)
 
-- moves the login server from Python to Rust, which should help with both and .
-
-- adds support for markdown streaming
-
-- improves the UI treatment of diffs so they are more readable when using a light background
-
+- moves the login server from Python to Rust, which should help with both and .
+- adds support for markdown streaming
+- improves the UI treatment of diffs so they are more readable when using a light background
 - `ctrl-z` can be used to suspend the TUI
 
 ============================================================
 
 ## [0.23.0](https://github.com/openai/codex/releases/tag/rust-v0.23.0)
 
-- Highlights
-
- - New commands and controls: support `/mcp` in TUI and a slash command `/approvals` to control approvals.
-
- - Reasoning controls: change reasoning effort and model at runtime `/model`; add “minimal” effort for GPT‑5 models.
-
- - Auth improvements: show login options when not signed in with ChatGPT and auto‑refresh ChatGPT auth token.
-
- - UI/UX polish: Ghostty Ctrl‑b/Ctrl‑f fallback, Ctrl+H as backspace, cursor position tweak after tab completion, color/accessibility updates (,).
-
+- Highlights
+ - New commands and controls: support `/mcp` in TUI and a slash command `/approvals` to control approvals.
+ - Reasoning controls: change reasoning effort and model at runtime `/model`; add “minimal” effort for GPT‑5 models.
+ - Auth improvements: show login options when not signed in with ChatGPT and auto‑refresh ChatGPT auth token.
+ - UI/UX polish: Ghostty Ctrl‑b/Ctrl‑f fallback, Ctrl+H as backspace, cursor position tweak after tab completion, color/accessibility updates (,).
  - Distribution/infra: zip archived binaries added to releases and DotSlash entry for Windows x86_64; upgraded to Rust 1.89 (,).
 
 ============================================================
@@ -218,56 +193,31 @@ Fixes abound!
 ## [0.24.0](https://github.com/openai/codex/releases/tag/rust-v0.24.0)
 
 ## Highlights
-### New Features
-
-- Queued messages
-
-- Copy Paste / Drag & Drop image files
-
-- Transcript mode (Ctrl+T) with scrolling ability
-
-- Edit/resume conversation (esc-esc) from previous messages
-
-- Web search when using explicit --search option
-
-
-
-
-
-### TUI
-
-- Hide CoT by default; show headers in status indicator
-
-- Show diff output in pager (+ with hunk headers)
-
-- Simplify command approval UI
-
-- Unify Esc/Ctrl+C interrupt handling
-
-- Fix windows powershell paste
-
-
-
-### Tools and execution
-
-- Add support for long-running shell commands `exec_command`/`write_stdin`
-
-- Improve apply_patch reliability
-
-- Cap retry counts
-
-- Improve cache hit rate by sorting MCP tools deterministically
-
-
-
-### Misc
-
-- Add model_verbosity config for GPT-5
-
-- Read all AGENTS.md files up to git root
-
-- Fix git root resolution in worktrees
-
+### New Features
+- Queued messages
+- Copy Paste / Drag & Drop image files
+- Transcript mode (Ctrl+T) with scrolling ability
+- Edit/resume conversation (esc-esc) from previous messages
+- Web search when using explicit --search option
+
+
+### TUI
+- Hide CoT by default; show headers in status indicator
+- Show diff output in pager (+ with hunk headers)
+- Simplify command approval UI
+- Unify Esc/Ctrl+C interrupt handling
+- Fix windows powershell paste
+
+### Tools and execution
+- Add support for long-running shell commands `exec_command`/`write_stdin`
+- Improve apply_patch reliability
+- Cap retry counts
+- Improve cache hit rate by sorting MCP tools deterministically
+
+### Misc
+- Add model_verbosity config for GPT-5
+- Read all AGENTS.md files up to git root
+- Fix git root resolution in worktrees
 - Improve error messages & handling (, , ,)
 
 ============================================================
@@ -275,46 +225,26 @@ Fixes abound!
 ## [0.25.0](https://github.com/openai/codex/releases/tag/rust-v0.25.0)
 
 ## Highlights
-### New Features
-
-- Core: remove_conversation API for manual cleanup in long‑lived servers
-
-- TUI: mouse wheel alternate scrolling in transcript/diff views
-
-- TUI: Alt+Ctrl+H deletes the previous word (parity with Alt+Backspace)
-
-- Execution: include context window on task_started events; model may vary per turn
-
-
-
-### TUI
-
-- Cache transcript line wraps to keep long transcripts responsive
-
-- Fix transcript lines appending to diff while a turn is running
-
-- Improve emoji rendering: proper spacing and ⌨️ emoji variant (,)
-
-- ESC with queued messages returns them to the composer
-
-- Prevent crash when backspacing placeholders near multibyte text
-
-
-
-### Tools and execution
-
-- Don’t send Exec deltas on apply_patch
-
-- Make git_diff_against_sha more robust (ignore custom drivers; handle dash‑prefixed files)
-
-- Reduce test load when running interactively
-
-
-
-### Misc
-
-- Deduplicate assistant messages in history
-
+### New Features
+- Core: remove_conversation API for manual cleanup in long‑lived servers
+- TUI: mouse wheel alternate scrolling in transcript/diff views
+- TUI: Alt+Ctrl+H deletes the previous word (parity with Alt+Backspace)
+- Execution: include context window on task_started events; model may vary per turn
+
+### TUI
+- Cache transcript line wraps to keep long transcripts responsive
+- Fix transcript lines appending to diff while a turn is running
+- Improve emoji rendering: proper spacing and ⌨️ emoji variant (,)
+- ESC with queued messages returns them to the composer
+- Prevent crash when backspacing placeholders near multibyte text
+
+### Tools and execution
+- Don’t send Exec deltas on apply_patch
+- Make git_diff_against_sha more robust (ignore custom drivers; handle dash‑prefixed files)
+- Reduce test load when running interactively
+
+### Misc
+- Deduplicate assistant messages in history
 - Remove the Codex GitHub Action for now
 
 ============================================================
@@ -322,188 +252,126 @@ Fixes abound!
 ## [0.26.0](https://github.com/openai/codex/releases/tag/rust-v0.26.0)
 
 ## Highlights
-### New Features
-
-- Custom `/prompts` loaded from `~/.codex/prompts`
-
-- New "View Image" tool to let Codex agentically view local images
-
-- MCP `GetConfig` endpoint to inspect resolved settings
-
-
-
-### TUI
-
-- Fix image pasting in Windows + improve burst paste handling
-
-- Prevent slash commands during an active task
-
-- Fix cursor position when suspending (^Z)
-
-- Reduce doubled lines and hanging list markers
-
-
-
-### Docs & Templates
-
-- Major README/docs refactor and navigation
-
-- CHANGELOG now points to Releases page
-
+### New Features
+- Custom `/prompts` loaded from `~/.codex/prompts`
+- New "View Image" tool to let Codex agentically view local images
+- MCP `GetConfig` endpoint to inspect resolved settings
+
+### TUI
+- Fix image pasting in Windows + improve burst paste handling
+- Prevent slash commands during an active task
+- Fix cursor position when suspending (^Z)
+- Reduce doubled lines and hanging list markers
+
+### Docs & Templates
+- Major README/docs refactor and navigation
+- CHANGELOG now points to Releases page
 - Add VS Code Extension issue template
 
 ============================================================
 
 ## [0.27.0](https://github.com/openai/codex/releases/tag/rust-v0.27.0)
 
-### Codex 0.27.0
-
- - **MCP stability**: drop mutexes earlier and avoid lock ordering pitfalls.
-
- - **Channel reliability**: switch to unbounded channel to prevent stalls.
-
- - **Performance/cleanup**: remove unnecessary flush calls.
-
- - **CI**: fix release build; specify `--profile` for `cargo clippy`.
-
+### Codex 0.27.0
+ - **MCP stability**: drop mutexes earlier and avoid lock ordering pitfalls.
+ - **Channel reliability**: switch to unbounded channel to prevent stalls.
+ - **Performance/cleanup**: remove unnecessary flush calls.
+ - **CI**: fix release build; specify `--profile` for `cargo clippy`.
  - **Docs**: safer Homebrew snippet; suggest `just fix -p` in `AGENTS.md`.
 
 ============================================================
 
 ## [0.28.0](https://github.com/openai/codex/releases/tag/rust-v0.28.0)
 
-- [Highlights]
-
- - TUI polish and stability improvements: reduced typing lag, cleaner streamed message formatting, better error handling, and improved input behavior.
-
- - Better Windows ARM build reliability and faster release-time builds.
-
-- [TUI/UX]
-
- - Fix laggy typing
-
- - Rework message styling for clarity
-
- - Remove extra blank lines in streamed agent messages
-
- - Hide “/init” suggestion when `AGENTS.md` exists
-
- - Ignore Enter on empty input to avoid queuing blank messages
-
- - Catch `get_cursor_position` errors to avoid crashes
-
- - Remove extra quote from disabled-command message
-
-- [Build & CI]
-
- - Leverage Windows 11 ARM for Windows ARM builds
-
- - Install `zstd` on Windows 11 ARM image used for releases
-
- - Populate Windows cache for release builds when PRs are opened
-
-- [Docs]
-
- - Fix config reference table
-
- - Update PR template link after docs refactor
-
-- [Logging/Telemetry]
-
- - Add logs when users change the model
-
-- [Dependencies]
-
+- [Highlights]
+ - TUI polish and stability improvements: reduced typing lag, cleaner streamed message formatting, better error handling, and improved input behavior.
+ - Better Windows ARM build reliability and faster release-time builds.
+- [TUI/UX]
+ - Fix laggy typing
+ - Rework message styling for clarity
+ - Remove extra blank lines in streamed agent messages
+ - Hide “/init” suggestion when `AGENTS.md` exists
+ - Ignore Enter on empty input to avoid queuing blank messages
+ - Catch `get_cursor_position` errors to avoid crashes
+ - Remove extra quote from disabled-command message
+- [Build & CI]
+ - Leverage Windows 11 ARM for Windows ARM builds
+ - Install `zstd` on Windows 11 ARM image used for releases
+ - Populate Windows cache for release builds when PRs are opened
+- [Docs]
+ - Fix config reference table
+ - Update PR template link after docs refactor
+- [Logging/Telemetry]
+ - Add logs when users change the model
+- [Dependencies]
  - Bump `regex-lite` to 0.1.7 in `codex-rs`
 
 ============================================================
 
 ## [0.29.0](https://github.com/openai/codex/releases/tag/rust-v0.29.0)
 
-### Codex 0.29.0
-
- - **Android/Termux support** by gating `arboard` on unsupported targets.
-
- - **Stable, cross‑platform file locking** using std `fs` APIs.
-
- - **Auth consolidation**: `CodexAuth` and `AuthManager` moved into the `core` crate.
-
- - **Rate‑limit handling restored** for API‑key usage.
-
- - **Core rollout refactor**: extract `rollout` module, add listing API, return file heads.
-
- - **Quality of life**: support `cd foo && ...` in `exec`/`apply_patch`, fix TUI flicker, prefer ratatui `Stylize`.
-
- - **Distribution**: include Windows ARM64 executable in the npm package.
-
+### Codex 0.29.0
+ - **Android/Termux support** by gating `arboard` on unsupported targets.
+ - **Stable, cross‑platform file locking** using std `fs` APIs.
+ - **Auth consolidation**: `CodexAuth` and `AuthManager` moved into the `core` crate.
+ - **Rate‑limit handling restored** for API‑key usage.
+ - **Core rollout refactor**: extract `rollout` module, add listing API, return file heads.
+ - **Quality of life**: support `cd foo && ...` in `exec`/`apply_patch`, fix TUI flicker, prefer ratatui `Stylize`.
+ - **Distribution**: include Windows ARM64 executable in the npm package.
  - **Switch to the latest search tool**.
 
 ============================================================
 
 ## [0.30.0](https://github.com/openai/codex/releases/tag/rust-v0.30.0)
 
-### Codex 0.30.0
-
-- **Breaking**: Stop loading project `.env` files automatically.
-
-- **Security/behavior**: Never store requests; free port by canceling pending OAuth login.
-
-- **Core/infra**: Introduce rollout policy; shared HTTP client; improved remaining context size; refined reasoning summary config/handling; corrected sandboxed shell tool description; improved server notification serialization.
-
-- **TUI/UX**: Fix approval dialog for large commands; pause status timer during modals; pager auto‑scroll; bash syntax highlighting; mac key glyphs; avoid zero‑height panic; improved @ file search (hidden dirs).
-
-- **DevEx/docs**: Recommended VS Code extensions; AGENTS.md prompt and clarifications; updated API key guidance; CI fixes.
-
-- **Deps**: Bump `uuid` and `wiremock`.
-
+### Codex 0.30.0
+- **Breaking**: Stop loading project `.env` files automatically.
+- **Security/behavior**: Never store requests; free port by canceling pending OAuth login.
+- **Core/infra**: Introduce rollout policy; shared HTTP client; improved remaining context size; refined reasoning summary config/handling; corrected sandboxed shell tool description; improved server notification serialization.
+- **TUI/UX**: Fix approval dialog for large commands; pause status timer during modals; pager auto‑scroll; bash syntax highlighting; mac key glyphs; avoid zero‑height panic; improved @ file search (hidden dirs).
+- **DevEx/docs**: Recommended VS Code extensions; AGENTS.md prompt and clarifications; updated API key guidance; CI fixes.
+- **Deps**: Bump `uuid` and `wiremock`.
 - **Windows**: no more asking for approvals on Full Access mode
 
 ============================================================
 
 ## [0.31.0](https://github.com/openai/codex/releases/tag/rust-v0.31.0)
 
-### Codex 0.31.0
-
-
-
+### Codex 0.31.0
+
 - added support for a `startup_timeout_ms` option when declaring an MCP server [(docs)](https://github.com/openai/codex/blob/main/docs/config.md#mcp_servers), which has been a highly requested feature, particularly for Windows users
-- Thanks to @Bit-urd for adding more fault tolerance to MCP startup
+ - Issue
+ - Issue
+ - Issue
+ - PR
+ - PR
+ - PR
+ - and more...
+- Thanks to [@Bit-urd](https://github.com/Bit-urd) for adding more fault tolerance to MCP startup
 - fixes image pasting from Finder with `ctrl+v` on macOS
 
 ============================================================
 
 ## [0.32.0](https://github.com/openai/codex/releases/tag/rust-v0.32.0)
 
-### Codex 0.32.0
-
-
-
-- MCP: add UA suffix when acting as a server; a few stability/compat tweaks
-
-- OSS: Broader `apply_patch` OSS compatibility.
-
-- Rollouts: initial groundwork and `rollout_path` included in responses.
-
-- TUI: Alt+Delete deletes the next word.
-
-- Protocol/Types: `ArchiveConversation` request; small exports and TS type improvements.
-
-- CI/Build: faster tests with `nextest`, add `shear`; minor macOS permission adjustment.
-
+### Codex 0.32.0
+
+- MCP: add UA suffix when acting as a server; a few stability/compat tweaks
+- OSS: Broader `apply_patch` OSS compatibility.
+- Rollouts: initial groundwork and `rollout_path` included in responses.
+- TUI: Alt+Delete deletes the next word.
+- Protocol/Types: `ArchiveConversation` request; small exports and TS type improvements.
+- CI/Build: faster tests with `nextest`, add `shear`; minor macOS permission adjustment.
 - Docs: clarified shell quoting in config.
 
 ============================================================
 
 ## [0.33.0](https://github.com/openai/codex/releases/tag/rust-v0.33.0)
 
-## Codex 0.33.0
-
-
-
-Key change is , which reverts because it introduced a regression.
-
-
-
+## Codex 0.33.0
+
+Key change is , which reverts because it introduced a regression.
+
 New Features
 - Try out the new Markdown renderer on .
 
@@ -523,124 +391,79 @@ See [0.36.0](https://github.com/openai/codex/releases/tag/rust-v0.36.0)
 
 ## [0.36.0](https://github.com/openai/codex/releases/tag/rust-v0.36.0)
 
-### **Breaking change:** `OPENAI_API_KEY` is no longer read from the environment
-
-
-
+### **Breaking change:** `OPENAI_API_KEY` is no longer read from the environment
+
 API login is no longer implicit; we do not pick up `OPENAI_API_KEY` from the environment. To use an API key programmatically, run the following _once_
-```shell
-
-codex login --api-key "your-api-key-here"
-
-```
-
-
-
-and this value will be stored in `CODEX_HOME/auth.json`.
-
-
-
-The next time you run `codex`, the API key stored in `auth.json` will be used automatically.
-
-
-
-To switch to ChatGPT login instead of using your API key, run `codex login`.
-
-
-
-Note that `codex logout` will remove whatever login credential is stored in `auth.json` (API key or ChatGPT auth token).
-
-
-
-### Highlights
-
-
-
-**Introducing our newest model GPT-5-Codex**
-
-GPT-5-Codex works faster through easy tasks and harder on complex tasks, improves on code quality, and is more steerable with AGENTS.md. [Learn More](https://openai.com/index/introducing-upgrades-to-codex/)
-
+```shell
+codex login --api-key "your-api-key-here"
+```
+
+and this value will be stored in `CODEX_HOME/auth.json`.
+
+The next time you run `codex`, the API key stored in `auth.json` will be used automatically.
+
+To switch to ChatGPT login instead of using your API key, run `codex login`.
+
+Note that `codex logout` will remove whatever login credential is stored in `auth.json` (API key or ChatGPT auth token).
+
+### Highlights
+
+**Introducing our newest model GPT-5-Codex**
+GPT-5-Codex works faster through easy tasks and harder on complex tasks, improves on code quality, and is more steerable with AGENTS.md. [Learn More](https://openai.com/index/introducing-upgrades-to-codex/)
  
 **Resuming old sessions** 
-Resuming old conversations with `codex resume` (,).
-
-
-
-**Unified execution and reliability**
-
-Unified execution improvements (,) and race-condition fix; include command output on timeouts; do not execute when command parses as a patch; improved sandbox timeout handling; flaky test fixes (,).
-
-
-
-**Auth and login experience**
-
-- login polish; fix issue allowing to be both logged in and using API key simultaneously; fix stray login URL characters; fix `get_auth_status` for custom providers.
-
-
-
-**JSON-RPC and MCP**
-
-JSON-RPC: `SetDefaultModel` and `None` clears default (,), `UserInfo`, `reasoning_effort` in `NewConversationResponse`; initial MCP interface and docs (, ,); standardized shell description.
-
-
-
-**TUI onboarding and polish**
-
-New onboarding flow and animation (, , ,), consistent headers on resume (,), improved spacing/padding (, , ,), clearer interruption and status styling, numerous UX nits addressed (,).
-
-
-
-**Core platform**
-
+Resuming old conversations with `codex resume` (,).
+
+**Unified execution and reliability**
+Unified execution improvements (,) and race-condition fix; include command output on timeouts; do not execute when command parses as a patch; improved sandbox timeout handling; flaky test fixes (,).
+
+**Auth and login experience**
+- login polish; fix issue allowing to be both logged in and using API key simultaneously; fix stray login URL characters; fix `get_auth_status` for custom providers.
+
+**JSON-RPC and MCP**
+JSON-RPC: `SetDefaultModel` and `None` clears default (,), `UserInfo`, `reasoning_effort` in `NewConversationResponse`; initial MCP interface and docs (, ,); standardized shell description.
+
+**TUI onboarding and polish**
+New onboarding flow and animation (, , ,), consistent headers on resume (,), improved spacing/padding (, , ,), clearer interruption and status styling, numerous UX nits addressed (,).
+
+**Core platform**
 Experimental automatic context compaction; expanded default sandbox; Azure Responses API workaround; preserve more item IDs in Azure; logging and clippy improvements (,); `just test` via nextest.
 
 ============================================================
 
 ## [0.37.0](https://github.com/openai/codex/releases/tag/rust-v0.37.0)
 
-Mostly small quality-of-life fixes in this release.
-
-
-
-## Highlights
-
-
-
+Mostly small quality-of-life fixes in this release.
+
+## Highlights
+
 Updated the npm release process to use ["trusted publishing"](https://docs.npmjs.com/trusted-publishers). Though apparently there was a bug, so we may not see the benefit until `0.38.0`. Fix is in .
 
 ============================================================
 
 ## [0.38.0](https://github.com/openai/codex/releases/tag/rust-v0.38.0)
 
-This release includes only one change on top of [0.37.0](https://github.com/openai/codex/releases/tag/rust-v0.37.0), which is a fix to the `npm-publish` step in the release process. Updating `npm` with the latest release is now fully automated, and if you visit https://www.npmjs.com/package/@openai/codex#provenance-details-header, you should now see this special _Provenance_ badge
+This release includes only one change on top of [0.37.0](https://github.com/openai/codex/releases/tag/rust-v0.37.0), which is a fix to the `npm-publish` step in the release process. Updating `npm` with the latest release is now fully automated, and if you visit https://www.npmjs.com/package/[@openai](https://github.com/openai)/codex#provenance-details-header, you should now see this special _Provenance_ badge
 <img width="777" height="196" alt="Screenshot 2025-09-17 at 11 24 50 AM" src="https://github.com/user-attachments/assets/faea39e2-9f21-4f60-9053-24e40c77b110" />
 
 ============================================================
 
 ## [0.39.0](https://github.com/openai/codex/releases/tag/rust-v0.39.0)
 
-## New Features
-
-
-
+## New Features
+
 - new `/review` command introduced
 
 ============================================================
 
 ## [0.40.0](https://github.com/openai/codex/releases/tag/rust-v0.40.0)
 
-## Notable Changes
-
-
-
-- Default model is now `gpt-5-codex`
-
-- Autocompaction is triggered automatically for `gpt-5-codex` when hitting 220k tokens
-
-- Usage limits are now visible in `/status`
-
-- New `/review` commands (review specific commit, against a base branch, or custom instructions)
-
+## Notable Changes
+
+- Default model is now `gpt-5-codex`
+- Autocompaction is triggered automatically for `gpt-5-codex` when hitting 220k tokens
+- Usage limits are now visible in `/status`
+- New `/review` commands (review specific commit, against a base branch, or custom instructions)
 - The default timeout for MCP tool calls is `60s` and can be overridden in `config.toml` by setting `tool_timeout_sec` for an individual MCP server.
 
 ============================================================
@@ -648,36 +471,24 @@ This release includes only one change on top of [0.37.0](https://github.com/open
 ## [0.41.0](https://github.com/openai/codex/releases/tag/rust-v0.41.0)
 
 ### Highlights
-- Rate limits visibility: You can see when is your limits resetting and see your usage when rate limited
-
-- You can specify output schema in `exec` mode using `output-schema`.
-
-- Ripgrep (`rg`) is now vendored into the `npm` release, which should fix issues such as where the `postinstall` step of `@vscode/ripgrep` would sometimes fail when installing `codex` via `npm`.
+- Rate limits visibility: You can see when is your limits resetting and see your usage when rate limited
+- You can specify output schema in `exec` mode using `output-schema`.
+- Ripgrep (`rg`) is now vendored into the `npm` release, which should fix issues such as where the `postinstall` step of `[@vscode](https://github.com/vscode)/ripgrep` would sometimes fail when installing `codex` via `npm`.
 
 ============================================================
 
 ## [0.42.0](https://github.com/openai/codex/releases/tag/rust-v0.42.0)
 
-## Notable Changes
-
-
-
-- Experimental Rust SDK–based MCP client introduced
-
-- New `responses-api-proxy` component to simplify and secure response handling/proxying
-
-- Added secure mode: `CODEX_SECURE_MODE=1` to restrict process observability
-
-- More explicit `codex exec` events, including `item.started` and improved output display (, ,)
-
-- Safer command execution: dangerous command checks in core and Windows-specific safety (,)
-
-- UX improvements: revamped `/status` with clearer presentation and details, pageless session list, approvals moved to `ListSelectionView`, better MCP tool call styling, and hiding status indicator during streaming (, , , ,)
-
-- Stability and correctness: token usage fix for compaction, SSE mounting reliability, and improving bugs on editing previous conversations (, ,)
-
-- IDE extension reliability: fix login with API key when `.codex` directory is missing
-
+## Notable Changes
+
+- Experimental Rust SDK–based MCP client introduced
+- New `responses-api-proxy` component to simplify and secure response handling/proxying
+- Added secure mode: `CODEX_SECURE_MODE=1` to restrict process observability
+- More explicit `codex exec` events, including `item.started` and improved output display (, ,)
+- Safer command execution: dangerous command checks in core and Windows-specific safety (,)
+- UX improvements: revamped `/status` with clearer presentation and details, pageless session list, approvals moved to `ListSelectionView`, better MCP tool call styling, and hiding status indicator during streaming (, , , ,)
+- Stability and correctness: token usage fix for compaction, SSE mounting reliability, and improving bugs on editing previous conversations (, ,)
+- IDE extension reliability: fix login with API key when `.codex` directory is missing
 - Internal cleanup and refactors for state, footer logic, and unused code (, ,)
 
 ============================================================
@@ -685,39 +496,26 @@ This release includes only one change on top of [0.37.0](https://github.com/open
 ## [0.44.0](https://github.com/openai/codex/releases/tag/rust-v0.44.0)
 
 ## Highlights
-- New UI refresh! Updated chat composer, bottom pane, model picker, and upgrade nudge (, , ,)
-
-- Custom prompts now support named & positional arguments (,)
-
-- Add support for streamable HTTP MCP servers
-
-- (experimental) Reduce repetitive approval for read-only commands on Windows
-
-- (very experimental) Manage cloud tasks with `codex cloud`
-
-
-
+- New UI refresh! Updated chat composer, bottom pane, model picker, and upgrade nudge (, , ,)
+- Custom prompts now support named & positional arguments (,)
+- Add support for streamable HTTP MCP servers
+- (experimental) Reduce repetitive approval for read-only commands on Windows
+- (very experimental) Manage cloud tasks with `codex cloud`
+
 + many more fixes and improvements
 
 ============================================================
 
 ## [0.45.0](https://github.com/openai/codex/releases/tag/rust-v0.45.0)
 
-## Breaking changes
-
-`codex login --api-key` was replaced with `codex login --with-api-key` that reads the key from `stdin` to improve security.
-
-
-
+## Breaking changes
+`codex login --api-key` was replaced with `codex login --with-api-key` that reads the key from `stdin` to improve security.
+
 Sample usage
-```bash
-
-printenv OPENAI_API_KEY | codex login --with-api-key
-
-```
-
-
-
+```bash
+printenv OPENAI_API_KEY | codex login --with-api-key
+```
+
 ## Highlights
 - Experimental support for OAuth MCP server authentication
 
@@ -725,70 +523,60 @@ printenv OPENAI_API_KEY | codex login --with-api-key
 
 ## [0.46.0](https://github.com/openai/codex/releases/tag/rust-v0.46.0)
 
-## Highlights
-
-
-
-### Improved MCP support
-
-We are in the middle of significantly improving support for connecting to MCP servers including support for streamable http servers with optional bearer token or oauth login support.
-
-
-
-Enable the `experimental_use_rmcp_client = true` flag in `config.toml` to use the new MCP stack. If you encounter issues, create a GitHub issue and add the `mcp` label. We would like to remove the experimental flag soon and will continue to expand MCP support over time.
-
-
-
-## What's Changed
-
-* [MCP] Fix the bearer token authorization header by @gpeal
-* Print codex resume note when quitting after codex resume by @nornagon-openai
-* Use Number instead of BigInt for TokenCountEvent by @ccy-oai
-* Simplify request body assertions by @pakrym-oai
-* Fix zsh completion by @tamird
-* [Cloud Tasks] Use workspace deps by @tamird
-* Simplify parallel by @pakrym-oai
-* [TUI] Remove bottom padding by @gpeal
-* [TUI] Dynamic width for line numbers in diffs by @nornagon-openai
-* [TUI] Wrapping bugfix by @nornagon-openai
-* Fix flaky test by @jif-oai
-* `list_dir` tool by @jif-oai
-* [TUI] Breathing spinner on true-color terms by @nornagon-openai
-* [TUI] Remove instruction hack for /review by @dedrisian-oai
-* Set codex SDK TypeScript originator by @pakrym-oai
-* [TUI] Bring the transcript closer to display mode by @nornagon-openai
-* [TUI] Switch to tree-sitter-highlight bash highlighting by @nornagon-openai
-* remove experimental prefix by @rakesh-oai
-* [MCP] Add the ability to explicitly specify a credentials store by @gpeal
-* [MCP] Add support for streamable http servers with `codex mcp add` and replace bearer token handling by @gpeal
-* featgrep_files as a tool by @jif-oai
-* CLI UP/ENTER by @jif-oai
-* change log_sse_event so it no longer takes a closure by @bolinfest
-* truncate on compact by @jif-oai
-* Fix transcript mode rendering issue when showing tab chars by @dedrisian-oai
-* [TUI] hardcode xterm palette, shimmer blends between fg and bg by @nornagon-openai
-* [MCP] Add an `enabled` config field by @gpeal
-* Make context line permanent by @dedrisian-oai
-* [MCP] Add auth status to MCP servers by @gpeal
-* [TUI] fix off-by-16 in terminal_palette by @nornagon-openai
-* Create alias by @rakesh-oai
-* Set chat name by @dedrisian-oai
-* revert /name for now by @dedrisian-oai
+## Highlights
+
+### Improved MCP support
+We are in the middle of significantly improving support for connecting to MCP servers including support for streamable http servers with optional bearer token or oauth login support.
+
+Enable the `experimental_use_rmcp_client = true` flag in `config.toml` to use the new MCP stack. If you encounter issues, create a GitHub issue and add the `mcp` label. We would like to remove the experimental flag soon and will continue to expand MCP support over time.
+
+## What's Changed
+* [MCP] Fix the bearer token authorization header by [@gpeal](https://github.com/gpeal)
+* Print codex resume note when quitting after codex resume by [@nornagon-openai](https://github.com/nornagon-openai)
+* Use Number instead of BigInt for TokenCountEvent by [@ccy-oai](https://github.com/ccy-oai)
+* Simplify request body assertions by [@pakrym-oai](https://github.com/pakrym-oai)
+* Fix zsh completion by [@tamird](https://github.com/tamird)
+* [Cloud Tasks] Use workspace deps by [@tamird](https://github.com/tamird)
+* Simplify parallel by [@pakrym-oai](https://github.com/pakrym-oai)
+* [TUI] Remove bottom padding by [@gpeal](https://github.com/gpeal)
+* [TUI] Dynamic width for line numbers in diffs by [@nornagon-openai](https://github.com/nornagon-openai)
+* [TUI] Wrapping bugfix by [@nornagon-openai](https://github.com/nornagon-openai)
+* Fix flaky test by [@jif-oai](https://github.com/jif-oai)
+* `list_dir` tool by [@jif-oai](https://github.com/jif-oai)
+* [TUI] Breathing spinner on true-color terms by [@nornagon-openai](https://github.com/nornagon-openai)
+* [TUI] Remove instruction hack for /review by [@dedrisian-oai](https://github.com/dedrisian-oai)
+* Set codex SDK TypeScript originator by [@pakrym-oai](https://github.com/pakrym-oai)
+* [TUI] Bring the transcript closer to display mode by [@nornagon-openai](https://github.com/nornagon-openai)
+* [TUI] Switch to tree-sitter-highlight bash highlighting by [@nornagon-openai](https://github.com/nornagon-openai)
+* remove experimental prefix by [@rakesh-oai](https://github.com/rakesh-oai)
+* [MCP] Add the ability to explicitly specify a credentials store by [@gpeal](https://github.com/gpeal)
+* [MCP] Add support for streamable http servers with `codex mcp add` and replace bearer token handling by [@gpeal](https://github.com/gpeal)
+* featgrep_files as a tool by [@jif-oai](https://github.com/jif-oai)
+* CLI UP/ENTER by [@jif-oai](https://github.com/jif-oai)
+* change log_sse_event so it no longer takes a closure by [@bolinfest](https://github.com/bolinfest)
+* truncate on compact by [@jif-oai](https://github.com/jif-oai)
+* Fix transcript mode rendering issue when showing tab chars by [@dedrisian-oai](https://github.com/dedrisian-oai)
+* [TUI] hardcode xterm palette, shimmer blends between fg and bg by [@nornagon-openai](https://github.com/nornagon-openai)
+* [MCP] Add an `enabled` config field by [@gpeal](https://github.com/gpeal)
+* Make context line permanent by [@dedrisian-oai](https://github.com/dedrisian-oai)
+* [MCP] Add auth status to MCP servers by [@gpeal](https://github.com/gpeal)
+* [TUI] fix off-by-16 in terminal_palette by [@nornagon-openai](https://github.com/nornagon-openai)
+* Create alias by [@rakesh-oai](https://github.com/rakesh-oai)
+* Set chat name by [@dedrisian-oai](https://github.com/dedrisian-oai)
+* revert /name for now by [@dedrisian-oai](https://github.com/dedrisian-oai)
+## New Contributors
+* [@ccy-oai](https://github.com/ccy-oai) made their first contribution
+* [@tamird](https://github.com/tamird) made their first contribution
 
 ============================================================
 
 ## [0.47.0](https://github.com/openai/codex/releases/tag/rust-v0.47.0)
 
-## Highlights
-
-
-
-- Improvements and bug-fixes in Codex CLI
-
-- Code signing binaries on MacOS
-
-- Auto update banner
-
+## Highlights
+
+- Improvements and bug-fixes in Codex CLI
+- Code signing binaries on MacOS
+- Auto update banner
 - :new: Warning when enabling "full access" mode
 
 ============================================================
@@ -796,159 +584,116 @@ Enable the `experimental_use_rmcp_client = true` flag in `config.toml` to use th
 ## [0.48.0](https://github.com/openai/codex/releases/tag/rust-v0.48.0)
 
 ## Highlights 
-* `--add-dir` to add an additional working directory.
-
+* `--add-dir` to add an additional working directory.
 * Many MCP improvements
- * stdio servers now use a new client backed by the official [rust MCP sdk](https://github.com/modelcontextprotocol/rust-sdk)
-
- * stdio servers can specify a `cwd`
-
- * All servers can specify `enabled_tools` or `disabled_tools`
-
- * Streamable HTTP servers can specify `scopes` during `codex mcp login`
-
- * Improved startup error messages
-
- * Better instruction following for calling tools
-
+ * stdio servers now use a new client backed by the official [rust MCP sdk](https://github.com/modelcontextprotocol/rust-sdk)
+ * stdio servers can specify a `cwd`
+ * All servers can specify `enabled_tools` or `disabled_tools`
+ * Streamable HTTP servers can specify `scopes` during `codex mcp login`
+ * Improved startup error messages
+ * Better instruction following for calling tools
 * Configuration options for `forced_login_method` and `forced_chatgpt_workspace_id` which can be paired with [managed configs](https://developers.openai.com/codex/security#managed-configuration) to give enterprises more control over Codex usage.
 
 ============================================================
 
 ## [0.49.0](https://github.com/openai/codex/releases/tag/rust-v0.49.0)
 
-## Highlights
-
+## Highlights
 * No major changes comparing to `v0.48.0` - `v0.49.0` is used for testing homebrew upgrade script.
 
 ============================================================
 
 ## [0.50.0](https://github.com/openai/codex/releases/tag/rust-v0.50.0)
 
-### Highlights
-
+### Highlights
 - Improved `/feedback` to get better diagnostics. Please use it to report any issues. (,).
 
 ============================================================
 
 ## [0.52.0](https://github.com/openai/codex/releases/tag/rust-v0.52.0)
 
-### Highlights
-
-- TUI polish: queued messages visible during streaming; Windows auto-mode guidance; undo op; compaction prompt configurable.
-
-- Images: client-side image resizing; prevent crashes with MIME verification; SDK image forwarding tests re-enabled.
-
-- Execute commands directly with `!<cmd>`
-
-- Ability to buy credits for more usage. [More information](https://help.openai.com/en/articles/12642688-using-credits-for-flexible-usage-in-chatgpt-pluspro)
-
-
-
-### Other improvements
-
-- Auth: new CLI auth storage abstraction with keyring support and configurable backend.
-
-- App server: GetConversationSummary RPC; fetch/resume conversation summaries by id; refined account/protocol types.
-
-- Execution/events: item streaming events; ghost commits; clearer deprecation warnings; better token refresh handling and logs.
-
+### Highlights
+- TUI polish: queued messages visible during streaming; Windows auto-mode guidance; undo op; compaction prompt configurable.
+- Images: client-side image resizing; prevent crashes with MIME verification; SDK image forwarding tests re-enabled.
+- Execute commands directly with `!<cmd>`
+- Ability to buy credits for more usage. [More information](https://help.openai.com/en/articles/12642688-using-credits-for-flexible-usage-in-chatgpt-pluspro)
+
+### Other improvements
+- Auth: new CLI auth storage abstraction with keyring support and configurable backend.
+- App server: GetConversationSummary RPC; fetch/resume conversation summaries by id; refined account/protocol types.
+- Execution/events: item streaming events; ghost commits; clearer deprecation warnings; better token refresh handling and logs.
 - Conversation management: centralized truncation for all tool outputs; filter out prior-turn reasoning; annotate conversations with model_provider.
 
 ============================================================
 
 ## [0.53.0](https://github.com/openai/codex/releases/tag/rust-v0.53.0)
 
-### Highlights
-
-- Fixing error 400 issues
-
+### Highlights
+- Fixing error 400 issues
 - Improve sandboxing for Java
 
 ============================================================
 
 ## [0.54.0](https://github.com/openai/codex/releases/tag/rust-v0.54.0)
 
-**⚠️ WARNING:** Attempting to pin musl 1.2.5 for DNS fixes in turned out to be the wrong fix. We reverted it in and published [0.55.0](https://github.com/openai/codex/releases/rust-v0.55.0).
-
-
-
+**⚠️ WARNING:** Attempting to pin musl 1.2.5 for DNS fixes in turned out to be the wrong fix. We reverted it in and published [0.55.0](https://github.com/openai/codex/releases/rust-v0.55.0).
+
 Otherwise, this release was mostly bugfixes and documentation tweaks.
 
 ============================================================
 
 ## [0.55.0](https://github.com/openai/codex/releases/tag/rust-v0.55.0)
 
-## Highlights
-
-
-
+## Highlights
+
  reverted the previous change, fixing (and other similar reports of the Codex CLI failing to start on Linux).
 
 ============================================================
 
 ## [0.56.0](https://github.com/openai/codex/releases/tag/rust-v0.56.0)
 
-### Highlights
-
+### Highlights
  - Introducing our new model GPT-5-Codex-Mini — a more compact and cost-efficient version of GPT-5-Codex
 
 ============================================================
 
 ## [0.57.0](https://github.com/openai/codex/releases/tag/rust-v0.57.0)
 
-### Highlights
-
-- TUI quality-of-life: ctrl-n/p navigation for slash command lists and backtracking skips the /status noise.
-
+### Highlights
+- TUI quality-of-life: ctrl-n/p navigation for slash command lists and backtracking skips the /status noise.
 - Improve timeout on long running commasnds
 
 ============================================================
 
 ## [0.58.0](https://github.com/openai/codex/releases/tag/rust-v0.58.0)
 
-### Highlights
-
-- Support for gpt5.1 models family. [Read more](www.openai.com/index/gpt-5-1)
-
-- App server enhancements: new JSON schema generator command, item started/completed events, macro cleanup, reduced boilerplate, and tightened duplicate-code hygiene.
-
+### Highlights
+- Support for gpt5.1 models family. [Read more](www.openai.com/index/gpt-5-1)
+- App server enhancements: new JSON schema generator command, item started/completed events, macro cleanup, reduced boilerplate, and tightened duplicate-code hygiene.
 - Quality of life fixes: doc updates (web_search, SDK, config), TUI shortcuts inline, seatbelt/Wayland/brew/compaction/cloud-tasks bugfixes, clearer warnings, auth-aware status output, and OTEL test stabilization.
 
 ============================================================
 
 ## [0.59.0](https://github.com/openai/codex/releases/tag/rust-v0.59.0)
 
-### Highlights
-
-
-
-- GPT-5.1-Codex-Max: introducing our newest frontier agentic coding model. GPT-5.1-Codex-Max delivers higher reliability, faster iteration, and support for long-running, project-scale workflows. Learn more at https://www.openai.com/index/gpt-5-1-codex-max
-
-- Native Compaction Support: added first-class support for Compaction, improving performance across extended coding sessions.
-
-- Expanded Tool Token Limits: codex models now support up to 10,000 tool output tokens. Configure this via `tool_output_token_limit` in `config.toml`.
-
-- Windows Agent mode: Introduced Agent mode for native Windows. Codex can read files, write files, and run commands in your working folder with fewer approvals. Agent mode uses a new experimental Windows sandbox to limit filesystem and network access. Learn more at https://developers.openai.com/codex/windows
-
-- TUI and UX Improvements
-
- * Eliminated ghost snapshot notifications when no `git` repository is present.
-
- * Codex Resume now displays branches and respects the current working directory for filtering.
-
- * Added placeholder icons for images.
-
+### Highlights
+
+- GPT-5.1-Codex-Max: introducing our newest frontier agentic coding model. GPT-5.1-Codex-Max delivers higher reliability, faster iteration, and support for long-running, project-scale workflows. Learn more at https://www.openai.com/index/gpt-5-1-codex-max
+- Native Compaction Support: added first-class support for Compaction, improving performance across extended coding sessions.
+- Expanded Tool Token Limits: codex models now support up to 10,000 tool output tokens. Configure this via `tool_output_token_limit` in `config.toml`.
+- Windows Agent mode: Introduced Agent mode for native Windows. Codex can read files, write files, and run commands in your working folder with fewer approvals. Agent mode uses a new experimental Windows sandbox to limit filesystem and network access. Learn more at https://developers.openai.com/codex/windows
+- TUI and UX Improvements
+ * Eliminated ghost snapshot notifications when no `git` repository is present.
+ * Codex Resume now displays branches and respects the current working directory for filtering.
+ * Added placeholder icons for images.
  * Credits are now visible in `/status`.
 
 ============================================================
 
 ## [0.60.1](https://github.com/openai/codex/releases/tag/rust-v0.60.1)
 
-Bug fix release, most of the new important changes are in https://github.com/openai/codex/releases/tag/rust-v0.59.0
-
-
-
+Bug fix release, most of the new important changes are in https://github.com/openai/codex/releases/tag/rust-v0.59.0
+
 ## Bug fix
 - Default model for API users is now `gpt-5.1-codex`
 
@@ -967,72 +712,42 @@ Bug fix release, most of the new important changes are in https://github.com/ope
 
 ## [0.63.0](https://github.com/openai/codex/releases/tag/rust-v0.63.0)
 
-## Bug fixes
-
+## Bug fixes
 - Fixes the bug where enabling web search can lead to `Invalid value: 'other'.` errors.
 
 ============================================================
 
 ## [0.64.0](https://github.com/openai/codex/releases/tag/rust-v0.64.0)
 
-## Features
-
-
-
- - Threads and turns now include git info, current working directory, CLI version, source metadata, and propagate thread and turn IDs on every item and error. They emit new notifications for diffs, plan updates, token-usage changes, and compaction events. File-change items provide output deltas, and ImageView items render images inline.
-
- - Review flow is enhanced with a detached review mode, explicit enter and exit events, review thread IDs, and review history remains visible after rollout filtering changes.
-
- - Execution gains an experimental “exp” model, unified exec pruning to limit session bloat, per-run custom environment injection, policy-approved command bypass, and Windows protections that flag risky browser or URL launches. History lookup now works on Windows and WSL, and model selection honors use_model.
-
- - Safety defaults improve via consolidated world-writable scanning and workspace-write enforcement of read-only .git directories. Sandbox assessment and approval flows align with trust policies.
-
- - MCP and shell tooling add shell-tool MCP login support, explicit capability declaration, sandbox awareness, publication to npm, and MCP elicitations. The rmcp client is upgraded to 0.10.0 for modern notifications.
-
- - Observability increases as command items expose process IDs and threads and turns emit token-usage and compaction events. Feedback metadata captures source information.
-
- - Tooling and ops gain follow-up v2 in the app-server test client, new config management utilities, and refreshed approvals documentation and quickstart placement.
-
-
-
- ## Bug fixes
-
-
-
- - PowerShell apply_patch parsing is corrected, and apply_patch tests now cover shell_command behavior.
-
- - Sandbox assessment regression is fixed, policy-approved commands are honored, dangerous-command checks are tightened on Windows, and workspace-write enforces .git read-only.
-
- - MCP startup tolerates missing type fields, stream error messages are clarified, and rmcp nix output hash issues are resolved.
-
- - Delegate cancellation no longer hangs unified exec, early-exit sessions are cleaned up, and duplicate “waited” renderings are suppressed.
-
- - recent_commits with limit zero now returns zero, and the NetBSD process-hardening build is unblocked.
-
- - Review rollout filtering is disabled so history shows, approval presets respect workspace-write, /approvals trust detection is corrected, and sandbox command assessment edge cases are fixed.
-
- - Compaction accounts for encrypted reasoning, handles token budgets accurately, and emits reliable token-usage and compaction events.
-
- - TTY stdin is required, WSL clipboard paths are normalized, and stale conversations are dropped on /new to avoid conflicts.
-
- - Custom prompt expansion with large pastes is fixed, example-config mistakes are corrected, and relative links and streamable_shell references are cleaned up. Upgrade messaging is corrected.
-
- - Windows sandbox treats <workspace_root>/.git as read-only, and risky browser launches are flagged before execution.
-
- - CLA allowlist now includes dependabot variants, and enterprises can skip upgrade checks and messages.
-
- - Flaky tests are stabilized, session recycling is improved, and rollout session initialization surfaces errors for diagnosis.
-
-
-
- ## Maintenance
-
-
-
- - Security and CI add cargo-audit and cargo-deny. GitHub Actions are updated to checkout v6 and upload-artifact v5. macOS 13 builds are dropped. A flaky Ubuntu variant is skipped. The next_minor_version script now resets the patch number correctly.
-
- - Dependencies are updated: libc 0.2.177, webbrowser 1.0.6, regex 1.12.2, toml_edit 0.23.5, arboard 3.6.1, serde_with 3.16.1, image 0.25.9, reqwest 0.12.24, tracing 0.1.43, and rmcp 0.10.0.
-
+## Features
+
+ - Threads and turns now include git info, current working directory, CLI version, source metadata, and propagate thread and turn IDs on every item and error. They emit new notifications for diffs, plan updates, token-usage changes, and compaction events. File-change items provide output deltas, and ImageView items render images inline.
+ - Review flow is enhanced with a detached review mode, explicit enter and exit events, review thread IDs, and review history remains visible after rollout filtering changes.
+ - Execution gains an experimental “exp” model, unified exec pruning to limit session bloat, per-run custom environment injection, policy-approved command bypass, and Windows protections that flag risky browser or URL launches. History lookup now works on Windows and WSL, and model selection honors use_model.
+ - Safety defaults improve via consolidated world-writable scanning and workspace-write enforcement of read-only .git directories. Sandbox assessment and approval flows align with trust policies.
+ - MCP and shell tooling add shell-tool MCP login support, explicit capability declaration, sandbox awareness, publication to npm, and MCP elicitations. The rmcp client is upgraded to 0.10.0 for modern notifications.
+ - Observability increases as command items expose process IDs and threads and turns emit token-usage and compaction events. Feedback metadata captures source information.
+ - Tooling and ops gain follow-up v2 in the app-server test client, new config management utilities, and refreshed approvals documentation and quickstart placement.
+
+ ## Bug fixes
+
+ - PowerShell apply_patch parsing is corrected, and apply_patch tests now cover shell_command behavior.
+ - Sandbox assessment regression is fixed, policy-approved commands are honored, dangerous-command checks are tightened on Windows, and workspace-write enforces .git read-only.
+ - MCP startup tolerates missing type fields, stream error messages are clarified, and rmcp nix output hash issues are resolved.
+ - Delegate cancellation no longer hangs unified exec, early-exit sessions are cleaned up, and duplicate “waited” renderings are suppressed.
+ - recent_commits with limit zero now returns zero, and the NetBSD process-hardening build is unblocked.
+ - Review rollout filtering is disabled so history shows, approval presets respect workspace-write, /approvals trust detection is corrected, and sandbox command assessment edge cases are fixed.
+ - Compaction accounts for encrypted reasoning, handles token budgets accurately, and emits reliable token-usage and compaction events.
+ - TTY stdin is required, WSL clipboard paths are normalized, and stale conversations are dropped on /new to avoid conflicts.
+ - Custom prompt expansion with large pastes is fixed, example-config mistakes are corrected, and relative links and streamable_shell references are cleaned up. Upgrade messaging is corrected.
+ - Windows sandbox treats <workspace_root>/.git as read-only, and risky browser launches are flagged before execution.
+ - CLA allowlist now includes dependabot variants, and enterprises can skip upgrade checks and messages.
+ - Flaky tests are stabilized, session recycling is improved, and rollout session initialization surfaces errors for diagnosis.
+
+ ## Maintenance
+
+ - Security and CI add cargo-audit and cargo-deny. GitHub Actions are updated to checkout v6 and upload-artifact v5. macOS 13 builds are dropped. A flaky Ubuntu variant is skipped. The next_minor_version script now resets the patch number correctly.
+ - Dependencies are updated: libc 0.2.177, webbrowser 1.0.6, regex 1.12.2, toml_edit 0.23.5, arboard 3.6.1, serde_with 3.16.1, image 0.25.9, reqwest 0.12.24, tracing 0.1.43, and rmcp 0.10.0.
  - Documentation is refreshed: approvals and config guidance, codex max and xhigh defaults, example-config fixes, CLA guidance, and removal of streamable_shell references.
 
 ============================================================

@@ -6,10 +6,15 @@
 
 import os
 import re
+import sys
 import requests
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# 添加项目根目录到路径
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from core.utils import clean_release_body
 
 RELEASES_API_URL = "https://api.github.com/repos/openai/codex/releases"
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
@@ -47,76 +52,6 @@ def fetch_all_releases():
         page += 1
 
     return all_releases
-
-
-def clean_body(body):
-    """清理 release body"""
-    if not body:
-        return ""
-
-    # 移除各种 PR 列表标题及后面所有内容
-    patterns = [
-        r'\n[-#]*\s*Full list of merged PRs.*',
-        r'\n[-#]*\s*Merged PRs.*',
-        r'\n[-#]*\s*All merged PRs.*',
-        r'\n[-#]*\s*List of merged PRs.*',
-        r'\n[-#]*\s*PRs Merged.*',
-        r'\n#+\s*PRs\s*\n.*',  # ### PRs 后跟换行
-    ]
-    clean = body
-    for pattern in patterns:
-        clean = re.sub(pattern, '', clean, flags=re.DOTALL | re.IGNORECASE)
-
-    # 移除 Full Changelog 行
-    clean = re.sub(r'\*?\*?Full Changelog\*?\*?:?.*', '', clean, flags=re.IGNORECASE)
-
-    # 移除 PR 列表行（各种格式）
-    clean = re.sub(r'^[-*]\s+.*(?:by @|— @).*(?:in #\d+|#\d+).*$', '', clean, flags=re.MULTILINE)
-    clean = re.sub(r'^[-*]\s+.*\(#\d+\)\s*—\s*@.*$', '', clean, flags=re.MULTILINE)
-    clean = re.sub(r'^#\d+\s+[–—-]\s+.*$', '', clean, flags=re.MULTILINE)
-    clean = re.sub(r'^[-*]\s+PR\s*$', '', clean, flags=re.MULTILINE)  # 单独的 "- PR" 行
-
-    # 移除内联的 PR/Issue 引用（如 #6222, (#6189)）
-    clean = re.sub(r'\s*\(#\d+(?:\s+#\d+)*\)', '', clean)
-    clean = re.sub(r'#\d+(?:\s+#\d+)*', '', clean)
-
-    # 移除 PR/Issue 链接
-    clean = re.sub(r'https://github\.com/openai/codex/pull/\d+', '', clean)
-    clean = re.sub(r'https://github\.com/openai/codex/issues/\d+', '', clean)
-
-    # 清理残留的引用文本
-    clean = re.sub(r'See\s+for details\.?', '', clean)
-    clean = re.sub(r'As of\s*,\s*', '', clean)
-    clean = re.sub(r'\s+in\s+so\s+', ' so ', clean)
-    clean = re.sub(r'\s+in\s*,', ',', clean)
-    clean = re.sub(r'\s+in\s*\)', ')', clean)
-    clean = re.sub(r'\s+in\s+because', ' because', clean)
-    clean = re.sub(r'\s+in\s*$', '', clean, flags=re.MULTILINE)
-    clean = re.sub(r'thanks to\s*$', '', clean, flags=re.MULTILINE | re.IGNORECASE)
-    clean = re.sub(r'fixing\s*\.?\s*$', '', clean, flags=re.MULTILINE)
-    clean = re.sub(r'\s*\(was the relevant GitHub issue\)\s*', ' ', clean)
-    clean = re.sub(r'gracefully\s+- ', 'gracefully\n- ', clean)
-    clean = re.sub(r'though from the additional details on\s*,', 'though', clean)
-    clean = re.sub(r'Though\s+should', 'Though it should', clean)
-    clean = re.sub(r'reverted\s*,\s*fixing', 'reverted the previous change, fixing', clean)
-
-    # 清理行首的空引用
-    clean = re.sub(r'^-\s+\s+', '- ', clean, flags=re.MULTILINE)
-    clean = re.sub(r'^\*\s+\s+', '* ', clean, flags=re.MULTILINE)
-
-    # 将 GitHub @用户名 转换为超链接
-    clean = re.sub(r'@(\w[\w-]*)', r'[@\1](https://github.com/\1)', clean)
-
-    # 清理多余空白和标点
-    clean = re.sub(r'\s*:\s*\.?\s*$', '', clean, flags=re.MULTILINE)
-    clean = re.sub(r'\s+\)', ')', clean)
-    clean = re.sub(r'\(\s+', '(', clean)
-    clean = re.sub(r'\(\s*\)', '', clean)
-    clean = re.sub(r',\s*$', '', clean, flags=re.MULTILINE)
-    clean = re.sub(r'[^\S\n]{2,}', ' ', clean)
-    clean = re.sub(r'\n{3,}', '\n\n', clean)
-
-    return clean.strip()
 
 
 def version_tuple(version):
@@ -166,7 +101,7 @@ def main():
 
         stable_releases.append({
             "name": name,
-            "body": clean_body(release.get("body", "")),
+            "body": clean_release_body(release.get("body", "")),
             "url": release.get("html_url", ""),
             "published_at": release.get("published_at", "")
         })
