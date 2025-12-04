@@ -1,8 +1,21 @@
 # AI Release Tracker
 
+<div align="center">
+
+[![][claude-code-shield]][claude-code-link]
+[![][codex-shield]][codex-link]
+
+</div>
+
 A monitoring tool for tracking version updates of AI coding tools. Automatically checks for new releases and sends bilingual notifications (English + Chinese) to Telegram.
 
 [中文文档](README_CN.md)
+
+<!-- Links & Images -->
+[claude-code-shield]: https://img.shields.io/badge/Telegram-@claude__code__push-0088CC?logo=telegram
+[claude-code-link]: https://t.me/claude_code_push
+[codex-shield]: https://img.shields.io/badge/Telegram-@codex__push-0088CC?logo=telegram
+[codex-link]: https://t.me/codex_push
 
 ## Features
 
@@ -15,10 +28,10 @@ A monitoring tool for tracking version updates of AI coding tools. Automatically
 
 ## Supported Tools
 
-| Tool | Script | Data Source |
-|------|--------|-------------|
-| Claude Code | products/claude_code/checker.py | GitHub CHANGELOG.md |
-| OpenAI Codex | products/codex/checker.py | GitHub releases Atom feed |
+| Tool | Script | Data Source | Telegram |
+|------|--------|-------------|----------|
+| Claude Code | products/claude_code/checker.py | GitHub CHANGELOG.md | [@claude_code_push](https://t.me/claude_code_push) |
+| OpenAI Codex | products/codex/checker.py | GitHub releases Atom feed | [@codex_push](https://t.me/codex_push) |
 
 ## Quick Start
 

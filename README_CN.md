@@ -1,8 +1,21 @@
 # AI Release Tracker
 
+<div align="center">
+
+[![][claude-code-shield]][claude-code-link]
+[![][codex-shield]][codex-link]
+
+</div>
+
 AI 编码工具版本更新监控工具。自动检查新版本发布，并发送双语通知（英文 + 中文）到 Telegram。
 
 [English](README.md)
+
+<!-- Links & Images -->
+[claude-code-shield]: https://img.shields.io/badge/Telegram-@claude__code__push-0088CC?logo=telegram
+[claude-code-link]: https://t.me/claude_code_push
+[codex-shield]: https://img.shields.io/badge/Telegram-@codex__push-0088CC?logo=telegram
+[codex-link]: https://t.me/codex_push
 
 ## 功能特性
 
@@ -15,10 +28,10 @@ AI 编码工具版本更新监控工具。自动检查新版本发布，并发�
 
 ## 支持的工具
 
-| 工具 | 脚本 | 数据源 |
-|------|------|--------|
-| Claude Code | products/claude_code/checker.py | GitHub CHANGELOG.md |
-| OpenAI Codex | products/codex/checker.py | GitHub releases Atom feed |
+| 工具 | 脚本 | 数据源 | Telegram |
+|------|------|--------|----------|
+| Claude Code | products/claude_code/checker.py | GitHub CHANGELOG.md | [@claude_code_push](https://t.me/claude_code_push) |
+| OpenAI Codex | products/codex/checker.py | GitHub releases Atom feed | [@codex_push](https://t.me/codex_push) |
 
 ## 快速开始
 
