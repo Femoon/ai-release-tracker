@@ -85,14 +85,18 @@ def parse_latest_stable_release(feed_xml):
 
 def clean_html_content(html_text):
     """清理 HTML 标签，提取纯文本，然后调用共享清理函数"""
-    # 将 <li> 标签转换为换行+列表符号（使用 ASCII 字符兼容 Windows GBK 终端）
-    clean = re.sub(r'<li[^>]*>', '\n- ', html_text)
-    # 移除其他 HTML 标签
-    clean = re.sub(r'<[^>]+>', '', clean)
-    # 处理 HTML 实体
-    clean = clean.replace('&lt;', '<').replace('&gt;', '>').replace('&amp;', '&')
+    # 1. 先处理 HTML 实体（原始内容是 &lt;li&gt; 形式，可能有双重编码）
+    clean = html_text
+    # 处理可能的双重编码（&amp;amp; → &amp; → &）
+    while '&amp;' in clean:
+        clean = clean.replace('&amp;', '&')
+    clean = clean.replace('&lt;', '<').replace('&gt;', '>')
     clean = clean.replace('&quot;', '"').replace('&#39;', "'")
-    # 调用共享清理函数进行进一步处理
+    # 2. 将 <li> 标签转换为换行+列表符号（使用 ASCII 字符兼容 Windows GBK 终端）
+    clean = re.sub(r'<li[^>]*>', '\n- ', clean)
+    # 3. 移除其他 HTML 标签
+    clean = re.sub(r'<[^>]+>', '', clean)
+    # 4. 调用共享清理函数进行进一步处理
     return clean_release_body(clean)
 
 
@@ -158,7 +162,10 @@ def main():
         print("-" * 50)
         if latest_content:
             print("更新内容：")
-            print(latest_content)
+            try:
+                print(latest_content)
+            except UnicodeEncodeError:
+                print("(内容包含特殊字符，已跳过终端显示，请查看输出文件)")
         else:
             print("（暂无更新说明）")
         print("-" * 50)
@@ -168,6 +175,21 @@ def main():
         # 发送 Telegram 通知
         original_content = latest_content or "（暂无更新说明）"
         translated = translate_changelog(latest_content) if latest_content else ""
+
+        # 调试：将内容写入本地文件
+        debug_output = os.path.join(PROJECT_ROOT, "output", "codex_debug_content.txt")
+        with open(debug_output, 'w', encoding='utf-8') as f:
+            f.write(f"版本: {latest_version}\n")
+            f.write(f"链接: {release_link}\n")
+            f.write("=" * 50 + "\n")
+            f.write("原文:\n")
+            f.write(original_content + "\n")
+            f.write("=" * 50 + "\n")
+            f.write("翻译:\n")
+            f.write(translated + "\n")
+        print(f"调试内容已保存到: {debug_output}")
+
+        # 发送 Telegram 通知
         send_bilingual_notification(
             version=latest_version,
             original=original_content,

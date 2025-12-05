@@ -89,7 +89,8 @@ def clean_release_body(body: str) -> str:
     clean = re.sub(r'\s*:\s*\.?\s*$', '', clean, flags=re.MULTILINE)
     clean = re.sub(r'\s+\)', ')', clean)
     clean = re.sub(r'\(\s+', '(', clean)
-    clean = re.sub(r'\(\s*\)', '', clean)
+    clean = re.sub(r'\([\s,]*\)', '', clean)  # 移除空括号和仅含逗号的括号如 (,) (, , ,)
+    clean = re.sub(r'\s+:', ':', clean)  # 移除冒号前的多余空格
     clean = re.sub(r',\s*$', '', clean, flags=re.MULTILINE)
     clean = re.sub(r'[^\S\n]{2,}', ' ', clean)
     clean = re.sub(r'\n{3,}', '\n\n', clean)
