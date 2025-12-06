@@ -5,9 +5,9 @@ concurrency:
   cancel-in-progress: true
 
 on:
-  # 定时触发：每30分钟检查一次
+  # 定时触发：每20分钟检查一次
   schedule:
-    - cron: '*/30 * * * *'
+    - cron: '*/20 * * * *'
   # 手动触发
   workflow_dispatch:
 
