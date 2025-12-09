@@ -29,7 +29,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
 VERSION_FILE = os.path.join(PROJECT_ROOT, "output", "codex_latest_version.txt")
 
 # GitHub API 配置
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
+GITHUB_TOKEN = os.getenv("GH_TOKEN", "")  # 使用 GH_TOKEN 避免与 GitHub Actions 的 GITHUB_TOKEN 冲突
 USER_AGENT = "ai-release-tracker/1.0"
 
 # Telegram 配置（独立环境变量）
@@ -359,7 +359,7 @@ def main():
     if GITHUB_TOKEN:
         print("✓ 使用 GitHub Token 进行 API 认证")
     else:
-        print("⚠  未配置 GITHUB_TOKEN，API 请求可能受速率限制")
+        print("⚠  未配置 GH_TOKEN，API 请求可能受速率限制")
     print("-" * 50)
 
     # 获取 releases feed
@@ -412,7 +412,7 @@ def main():
     if resolve_error == "auth_error":
         print("-" * 50)
         print("⚠️  版本迁移失败：GitHub 认证失败")
-        print("提示：请检查 GITHUB_TOKEN 是否有效")
+        print("提示：请检查 GH_TOKEN 是否有效")
         return 1
 
     # 如果无法验证非标准版本格式，警告但继续（允许用户手动处理）

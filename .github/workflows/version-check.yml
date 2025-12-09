@@ -39,6 +39,8 @@ jobs:
 
       - name: Run version check
         env:
+          # GitHub API Token (用于访问 openai/codex API，避免速率限制)
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
           # Claude Code 通知配置
           CLAUDE_CODE_BOT_TOKEN: ${{ secrets.CLAUDE_CODE_BOT_TOKEN }}
           CLAUDE_CODE_CHAT_ID: ${{ secrets.CLAUDE_CODE_CHAT_ID }}

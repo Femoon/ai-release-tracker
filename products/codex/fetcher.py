@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from core.utils import clean_release_body
 
 RELEASES_API_URL = "https://api.github.com/repos/openai/codex/releases"
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
+GITHUB_TOKEN = os.getenv("GH_TOKEN", "")  # 使用 GH_TOKEN 避免与 GitHub Actions 的 GITHUB_TOKEN 冲突
 
 # 获取项目根目录
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -36,7 +36,7 @@ def fetch_all_releases():
         headers["Authorization"] = f"Bearer {GITHUB_TOKEN}"
         print("使用 GitHub Token 认证")
     else:
-        print("警告: 未配置 GITHUB_TOKEN，可能遇到速率限制")
+        print("警告: 未配置 GH_TOKEN，可能遇到速率限制")
 
     while True:
         url = f"{RELEASES_API_URL}?page={page}&per_page={per_page}"

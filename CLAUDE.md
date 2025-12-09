@@ -93,11 +93,13 @@ export LLM_MODEL="openrouter/google/gemini-2.5-flash"
 
 ## GitHub API 配置（可选）
 
-仅 `products/codex/fetcher.py` 使用 GitHub API 获取 releases 信息，可配置 Token 避免速率限制：
+用于 codex checker 和 fetcher 访问 GitHub API，避免速率限制：
 
 ```bash
-export GITHUB_TOKEN="your_github_token"
+export GH_TOKEN="your_github_token"
 ```
+
+**注意**：不要使用 `GITHUB_TOKEN`，这是 GitHub Actions 的保留变量名。
 
 未配置时脚本仍可运行，但可能遇到速率限制（60 次/小时）。配置后提升至 5000 次/小时。
 
@@ -145,8 +147,9 @@ CODEX_CHAT_ID=your_codex_chat_id
 # AI 翻译配置
 LLM_API_KEY=your_llm_api_key
 
-# GitHub API 配置（可选，仅 codex/fetcher.py 使用）
-# GITHUB_TOKEN=your_github_token
+# GitHub API 配置（可选，避免 API 速率限制）
+# 注意：不要使用 GITHUB_TOKEN（GitHub Actions 保留变量）
+# GH_TOKEN=your_github_token
 ```
 
 docker-compose 会自动读取 `.env` 文件。
