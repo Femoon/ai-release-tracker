@@ -95,10 +95,37 @@ def clean_release_body(body: str) -> str:
     clean = re.sub(r'[^\S\n]{2,}', ' ', clean)
     clean = re.sub(r'\n{3,}', '\n\n', clean)
 
+    # 清理句末多余的点（如 "sigstore.." → "sigstore."）
+    clean = re.sub(r'\.{2,}', '.', clean)
+
+    # 清理独立的点（单独一行只有点的情况）
+    clean = re.sub(r'^\s*\.\s*$', '', clean, flags=re.MULTILINE)
+
     # 统一列表符号为 -（兼容 Windows GBK 终端）
     clean = re.sub(r'^[*]\s+', '- ', clean, flags=re.MULTILINE)
 
     # 删除列表项之间的空行
     clean = re.sub(r'\n\n+(?=- )', '\n', clean)
+
+    # 将常见的标题关键词加粗并添加空行（提升阅读体验）
+    # 匹配行首的标题词，加粗并在后面添加空行
+    title_keywords = [
+        'Highlights?',
+        'What\'?s New',
+        'Breaking Changes?',
+        'New Features?',
+        'Bug Fixes?',
+        'Improvements?',
+        'Changes?',
+        'Notes?',
+    ]
+    for keyword in title_keywords:
+        # 匹配行首的关键词（可能带冒号），加粗并在后面添加空行
+        clean = re.sub(
+            rf'^({keyword})(\s*:?\s*)$',
+            r'**\1**\n',
+            clean,
+            flags=re.MULTILINE | re.IGNORECASE
+        )
 
     return clean.strip()
