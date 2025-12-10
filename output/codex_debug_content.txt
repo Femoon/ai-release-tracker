@@ -1,5 +1,6 @@
-版本: 0.66.0
-链接: https://github.com/openai/codex/releases/tag/rust-v0.66.0
+Tag: rust-v0.69.0
+Title: 0.69.0
+链接: https://github.com/openai/codex/releases/tag/rust-v0.69.0
 ==================================================
 原文:
 No content.
