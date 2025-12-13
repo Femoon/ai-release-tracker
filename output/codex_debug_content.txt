@@ -1,9 +1,25 @@
-Tag: rust-v0.71.0
-Title: 0.71.0
-链接: https://github.com/openai/codex/releases/tag/rust-v0.71.0
+Tag: rust-v0.72.0
+Title: 0.72.0
+链接: https://github.com/openai/codex/releases/tag/rust-v0.72.0
 ==================================================
 原文:
-No content.
+**Highlights**
+
+- Config API cleanup: new config API and cleaner config loading flow.
+- Remote compact for API-key users: enable remote compacting in key-based sessions.
+- MCP and TUI status visibility: restore MCP startup progress messages in the TUI and use latest disk values
+for server status.
+- Windows and PowerShell quality-of-life: locate pwsh/powershell reliably, parse PowerShell with
+PowerShell, sign additional Windows executables, and fix WSL2 toasts.
+- Sandbox and safety updates: Elevated Sandbox 3/4 plus expanded safe command list.
+- Model/prompt UX for gpt-5.2: prompt updates and clearer xhigh reasoning warnings/docs.
 ==================================================
 翻译:
-无内容。
+**亮点**
+
+- 配置 API 清理：新的配置 API 和更清晰的配置加载流程。
+- API 密钥用户的远程压缩：在基于密钥的会话中启用远程压缩。
+- MCP 和 TUI 状态可见性：在 TUI 中恢复 MCP 启动进度消息，并使用最新的磁盘值作为服务器状态。
+- Windows 和 PowerShell 质量改进：可靠地定位 pwsh/powershell，使用 PowerShell 解析 PowerShell，签署额外的 Windows 可执行文件，并修复 WSL2 提示。
+- 沙盒和安全更新：提升沙盒 3/4，并扩展安全命令列表。
+- gpt-5.2 的模型/提示用户体验：提示更新和更清晰的 xhigh 推理警告/文档。
