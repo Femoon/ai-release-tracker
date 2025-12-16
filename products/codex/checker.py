@@ -10,6 +10,8 @@ import re
 import sys
 import xml.etree.ElementTree as ET
 import requests
+import json
+import hashlib
 
 # 加载 .env 文件
 from dotenv import load_dotenv
@@ -17,7 +19,7 @@ load_dotenv()
 
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from core.notify.telegram import send_bilingual_notification
+from core.notify.telegram import send_bilingual_notification, edit_bilingual_notification
 from core.translate import translate_changelog
 from core.utils import clean_release_body
 
@@ -27,6 +29,7 @@ GITHUB_RELEASE_BY_TAG_URL = "https://api.github.com/repos/openai/codex/releases/
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
 VERSION_FILE = os.path.join(PROJECT_ROOT, "output", "codex_latest_version.txt")
+MESSAGE_STATE_FILE = os.path.join(PROJECT_ROOT, "output", "codex_message_state.json")
 
 # GitHub API 配置
 GITHUB_TOKEN = os.getenv("GH_TOKEN", "")  # 使用 GH_TOKEN 避免与 GitHub Actions 的 GITHUB_TOKEN 冲突
@@ -283,6 +286,55 @@ def save_version(version):
         return False
 
 
+def compute_body_hash(body):
+    """计算 body 内容的 hash 值"""
+    if not body:
+        return ""
+    return hashlib.md5(body.encode('utf-8')).hexdigest()
+
+
+def read_message_state():
+    """
+    读取消息状态文件
+
+    Returns:
+        dict: {"version": str, "message_ids": list, "body_hash": str} 或 None
+    """
+    if not os.path.exists(MESSAGE_STATE_FILE):
+        return None
+
+    try:
+        with open(MESSAGE_STATE_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"读取消息状态文件失败: {e}")
+        return None
+
+
+def save_message_state(version, message_ids, body_hash):
+    """
+    保存消息状态到文件
+
+    Args:
+        version: 版本号
+        message_ids: Telegram 消息 ID 列表
+        body_hash: body 内容的 hash 值
+    """
+    try:
+        os.makedirs(os.path.dirname(MESSAGE_STATE_FILE), exist_ok=True)
+        state = {
+            "version": version,
+            "message_ids": message_ids,
+            "body_hash": body_hash
+        }
+        with open(MESSAGE_STATE_FILE, 'w', encoding='utf-8') as f:
+            json.dump(state, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        print(f"保存消息状态失败: {e}")
+        return False
+
+
 def resolve_saved_version_to_tag(saved_version):
     """
     尝试将保存的版本（可能是 title）解析为 tag name
@@ -425,9 +477,46 @@ def main():
 
     # 比对版本
     if saved_tag == latest_tag:
-        # 版本相同
+        # 版本相同，检查 body 是否有更新
         print("-" * 50)
         print(f"当前已是最新稳定版本")
+
+        # 检查 body 是否有变化（用于处理开发者延迟更新 release notes 的情况）
+        current_body_hash = compute_body_hash(latest_content)
+        message_state = read_message_state()
+
+        if message_state and message_state.get("version") == latest_tag:
+            saved_body_hash = message_state.get("body_hash", "")
+            saved_message_ids = message_state.get("message_ids", [])
+
+            # 检查 body 是否有变化且之前的 body 是空的
+            if saved_body_hash != current_body_hash and saved_message_ids:
+                print("-" * 50)
+                print("检测到 Release Notes 已更新，正在编辑之前发送的通知...")
+
+                # 翻译新内容
+                original_content = latest_content or "（暂无更新说明）"
+                translated = translate_changelog(latest_content) if latest_content else ""
+
+                # 编辑之前发送的消息
+                edit_result = edit_bilingual_notification(
+                    message_ids=saved_message_ids,
+                    version=latest_title,
+                    original=original_content,
+                    translated=translated,
+                    title="OpenAI Codex",
+                    bot_token=TELEGRAM_BOT_TOKEN,
+                    chat_id=TELEGRAM_CHAT_ID,
+                    version_url=release_link
+                )
+
+                if edit_result["success"]:
+                    print("消息编辑成功")
+                    # 更新 body_hash 和可能变化的 message_ids
+                    save_message_state(latest_tag, edit_result["message_ids"], current_body_hash)
+                else:
+                    print("消息编辑失败，可能消息已被删除")
+
         # 如果刚刚解析了旧格式，更新版本文件
         if was_resolved:
             save_version(latest_tag)
@@ -468,7 +557,7 @@ def main():
         print(f"调试内容已保存到: {debug_output}")
 
         # 发送 Telegram 通知
-        send_bilingual_notification(
+        notify_result = send_bilingual_notification(
             version=latest_title,  # 使用 title 作为显示版本号（更友好）
             original=original_content,
             translated=translated,
@@ -477,6 +566,12 @@ def main():
             chat_id=TELEGRAM_CHAT_ID,
             version_url=release_link
         )
+
+        # 保存消息状态（用于后续 body 更新时编辑消息）
+        if notify_result["success"] and notify_result["message_ids"]:
+            body_hash = compute_body_hash(latest_content)
+            save_message_state(latest_tag, notify_result["message_ids"], body_hash)
+            print(f"消息状态已保存 (message_ids: {notify_result['message_ids']})")
 
         return 0
 

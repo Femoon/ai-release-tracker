@@ -171,10 +171,10 @@ def main(max_count=3, push_all=False):
                 chat_id=TELEGRAM_CHAT_ID
             )
 
-            if result:
+            if result["success"]:
                 break
 
-        if result:
+        if result["success"]:
             # 记录已推送
             append_pushed_version(version)
             success_count += 1

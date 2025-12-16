@@ -27,4 +27,7 @@ env/
 # 日志
 *.log
 
+# 运行时产物（调试文件）
+output/codex_debug_content.txt
+
 .claude/

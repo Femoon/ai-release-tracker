@@ -97,7 +97,7 @@ def clean_for_telegram(text: str, remove_version: bool = False) -> str:
     return text.strip()
 
 
-def send_telegram_message(message: str, bot_token: str = None, chat_id: str = None) -> bool:
+def send_telegram_message(message: str, bot_token: str = None, chat_id: str = None) -> dict:
     """
     发送 Telegram 消息
 
@@ -107,7 +107,7 @@ def send_telegram_message(message: str, bot_token: str = None, chat_id: str = No
         chat_id: Chat ID，不传则使用环境变量 TELEGRAM_CHAT_ID
 
     Returns:
-        bool: 发送是否成功
+        dict: {"success": bool, "message_id": int or None}
     """
     bot_token = bot_token or os.getenv("TELEGRAM_BOT_TOKEN", "")
     chat_id = chat_id or os.getenv("TELEGRAM_CHAT_ID", "")
@@ -120,7 +120,7 @@ def send_telegram_message(message: str, bot_token: str = None, chat_id: str = No
 
     if not bot_token or not chat_id:
         print("Telegram 配置未设置，跳过通知")
-        return False
+        return {"success": False, "message_id": None}
 
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
 
@@ -136,15 +136,138 @@ def send_telegram_message(message: str, bot_token: str = None, chat_id: str = No
     try:
         response = requests.post(url, json=data, timeout=10)
         response.raise_for_status()
-        print("Telegram 通知发送成功")
-        return True
+        result = response.json()
+        message_id = result.get("result", {}).get("message_id")
+        print(f"Telegram 通知发送成功 (message_id: {message_id})")
+        return {"success": True, "message_id": message_id}
     except requests.RequestException as e:
         print(f"Telegram 通知发送失败: {e}")
-        return False
+        return {"success": False, "message_id": None}
+
+
+def edit_telegram_message(
+    message_id: int,
+    message: str,
+    bot_token: str = None,
+    chat_id: str = None
+) -> dict:
+    """
+    编辑已发送的 Telegram 消息
+
+    Args:
+        message_id: 要编辑的消息 ID
+        message: 新的消息内容
+        bot_token: Bot Token
+        chat_id: Chat ID
+
+    Returns:
+        dict: {"success": bool, "message_id": int or None}
+    """
+    bot_token = bot_token or os.getenv("TELEGRAM_BOT_TOKEN", "")
+    chat_id = chat_id or os.getenv("TELEGRAM_CHAT_ID", "")
+
+    if bot_token:
+        bot_token = bot_token.strip()
+    if chat_id:
+        chat_id = chat_id.strip()
+
+    if not bot_token or not chat_id:
+        print("Telegram 配置未设置，跳过编辑")
+        return {"success": False, "message_id": None}
+
+    url = f"https://api.telegram.org/bot{bot_token}/editMessageText"
+
+    processed_message = process_message_for_markdown_v2(message)
+
+    data = {
+        "chat_id": chat_id,
+        "message_id": message_id,
+        "text": processed_message,
+        "parse_mode": "MarkdownV2",
+        "disable_web_page_preview": True,
+    }
+
+    try:
+        response = requests.post(url, json=data, timeout=10)
+        # 先检查响应内容，处理 Telegram API 特定错误
+        result = response.json()
+        if not result.get("ok"):
+            error_desc = result.get("description", "").lower()
+            if "message is not modified" in error_desc:
+                print("消息内容未变化，无需编辑")
+                return {"success": True, "message_id": message_id}
+            print(f"Telegram 消息编辑失败: {result.get('description')}")
+            return {"success": False, "message_id": None}
+
+        edited_message_id = result.get("result", {}).get("message_id")
+        print(f"Telegram 消息编辑成功 (message_id: {edited_message_id})")
+        return {"success": True, "message_id": edited_message_id}
+    except requests.RequestException as e:
+        print(f"Telegram 消息编辑失败: {e}")
+        return {"success": False, "message_id": None}
 
 
 # Telegram 消息长度限制
 MAX_MESSAGE_LENGTH = 4096
+
+
+def _build_bilingual_messages(
+    version: str,
+    original: str,
+    translated: str,
+    title: str,
+    version_url: str = None
+) -> dict:
+    """
+    构建双语消息内容（内部辅助函数）
+
+    Returns:
+        dict: {
+            "en_message": str,      # 英文消息
+            "cn_message": str,      # 中文消息
+            "combined_message": str, # 合并消息
+            "is_oversized": bool    # 合并消息是否超长
+        }
+    """
+    # 清理内容
+    original_clean = clean_for_telegram(original, remove_version=True)
+    translated_clean = clean_for_telegram(translated, remove_version=True) if translated else ""
+    original_en = original_clean.replace('链接:', 'Source:')
+
+    # 构建标题
+    if version_url:
+        en_title = f"*{title} [{version}]({version_url}) Released*"
+        cn_title = f"*{title} [{version}]({version_url}) 发布*"
+    else:
+        en_title = f"*{title} {version} Released*"
+        cn_title = f"*{title} {version} 发布*"
+
+    # 构建英文消息
+    en_lines = [en_title, "", original_en] if title else [original_en]
+    en_message = "\n".join(en_lines)
+
+    # 构建中文消息
+    cn_content = translated_clean if translated_clean else "（无翻译）"
+    cn_lines = [cn_title, "", cn_content] if title else [cn_content]
+    cn_message = "\n".join(cn_lines)
+
+    # 构建合并消息
+    combined_lines = [en_title, "", original_en] if title else [original_en]
+    if translated_clean:
+        combined_lines.extend(["", translated_clean])
+    combined_message = "\n".join(combined_lines)
+
+    # 检测合并消息长度
+    processed_combined = process_message_for_markdown_v2(combined_message)
+    is_oversized = len(processed_combined) > MAX_MESSAGE_LENGTH
+
+    return {
+        "en_message": en_message,
+        "cn_message": cn_message,
+        "combined_message": combined_message,
+        "is_oversized": is_oversized,
+        "combined_length": len(processed_combined)
+    }
 
 
 def send_bilingual_notification(
@@ -155,7 +278,7 @@ def send_bilingual_notification(
     bot_token: str = None,
     chat_id: str = None,
     version_url: str = None
-) -> bool:
+) -> dict:
     """
     发送双语通知，自动处理长度限制
 
@@ -172,62 +295,98 @@ def send_bilingual_notification(
         version_url: 版本链接（可选，用于生成超链接标题）
 
     Returns:
-        bool: 发送是否成功
+        dict: {"success": bool, "message_ids": list[int]}
     """
-    # 清理内容
-    original_clean = clean_for_telegram(original, remove_version=True)
-    translated_clean = clean_for_telegram(translated, remove_version=True) if translated else ""
+    msgs = _build_bilingual_messages(version, original, translated, title, version_url)
 
-    # 英文内容：将 "链接:" 替换为 "Source:"
-    original_en = original_clean.replace('链接:', 'Source:')
-
-    # 构建标题（支持超链接）
-    if version_url:
-        en_title = f"*{title} [{version}]({version_url}) Released*"
-        cn_title = f"*{title} [{version}]({version_url}) 发布*"
-    else:
-        en_title = f"*{title} {version} Released*"
-        cn_title = f"*{title} {version} 发布*"
-
-    # 生成合并的双语消息
-    lines = []
-    if title:
-        lines.append(en_title)
-        lines.append("")
-    lines.append(original_en)
-    if translated_clean:
-        lines.append("")
-        lines.append(translated_clean)
-    combined_message = "\n".join(lines)
-
-    # 计算转义后长度
-    processed_combined = process_message_for_markdown_v2(combined_message)
-
-    if len(processed_combined) <= MAX_MESSAGE_LENGTH:
+    if not msgs["is_oversized"]:
         # 长度在限制内，发送合并消息
-        return send_telegram_message(combined_message, bot_token, chat_id)
+        result = send_telegram_message(msgs["combined_message"], bot_token, chat_id)
+        message_ids = [result["message_id"]] if result["message_id"] else []
+        return {"success": result["success"], "message_ids": message_ids}
     else:
         # 超出限制，分两条发送
-        print(f"消息长度 {len(processed_combined)} 超出限制，分两条发送")
+        print(f"消息长度 {msgs['combined_length']} 超出限制，分两条发送")
 
-        # 英文消息
-        en_lines = []
-        if title:
-            en_lines.append(en_title)
-            en_lines.append("")
-        en_lines.append(original_en)
-        en_message = "\n".join(en_lines)
+        result1 = send_telegram_message(msgs["en_message"], bot_token, chat_id)
+        result2 = send_telegram_message(msgs["cn_message"], bot_token, chat_id)
 
-        # 中文消息
-        cn_lines = []
-        if title:
-            cn_lines.append(cn_title)
-            cn_lines.append("")
-        cn_lines.append(translated_clean if translated_clean else "（无翻译）")
-        cn_message = "\n".join(cn_lines)
+        message_ids = []
+        if result1["message_id"]:
+            message_ids.append(result1["message_id"])
+        if result2["message_id"]:
+            message_ids.append(result2["message_id"])
 
-        # 发送两条消息
-        result1 = send_telegram_message(en_message, bot_token, chat_id)
-        result2 = send_telegram_message(cn_message, bot_token, chat_id)
+        return {"success": result1["success"] and result2["success"], "message_ids": message_ids}
 
-        return result1 and result2
+
+def edit_bilingual_notification(
+    message_ids: list,
+    version: str,
+    original: str,
+    translated: str,
+    title: str,
+    bot_token: str = None,
+    chat_id: str = None,
+    version_url: str = None
+) -> dict:
+    """
+    编辑已发送的双语通知
+
+    处理策略:
+    - 1条消息 + 内容不超长: 直接编辑
+    - 1条消息 + 内容超长: 编辑为英文，新发中文
+    - 2条消息: 分别编辑英文和中文
+
+    Args:
+        message_ids: 要编辑的消息 ID 列表（1个或2个）
+        version: 版本号
+        original: 英文原文
+        translated: 中文翻译
+        title: 标题
+        bot_token: Bot Token
+        chat_id: Chat ID
+        version_url: 版本链接
+
+    Returns:
+        dict: {"success": bool, "message_ids": list[int]}
+    """
+    if not message_ids:
+        print("没有可编辑的消息 ID")
+        return {"success": False, "message_ids": []}
+
+    msgs = _build_bilingual_messages(version, original, translated, title, version_url)
+    is_single_message = len(message_ids) == 1
+
+    # 情况1: 原本是单条消息
+    if is_single_message:
+        if not msgs["is_oversized"]:
+            # 内容不超长，直接编辑合并消息
+            result = edit_telegram_message(message_ids[0], msgs["combined_message"], bot_token, chat_id)
+            return {
+                "success": result["success"],
+                "message_ids": message_ids if result["success"] else []
+            }
+        else:
+            # 内容超长，需要拆分: 编辑原消息为英文，新发一条中文
+            print(f"消息长度 {msgs['combined_length']} 超出限制，拆分为2条消息")
+            result1 = edit_telegram_message(message_ids[0], msgs["en_message"], bot_token, chat_id)
+            result2 = send_telegram_message(msgs["cn_message"], bot_token, chat_id)
+
+            new_ids = list(message_ids)
+            if result2["message_id"]:
+                new_ids.append(result2["message_id"])
+
+            return {
+                "success": result1["success"] and result2["success"],
+                "message_ids": new_ids if result1["success"] else []
+            }
+
+    # 情况2: 原本是两条消息，分别编辑
+    result1 = edit_telegram_message(message_ids[0], msgs["en_message"], bot_token, chat_id)
+    result2 = edit_telegram_message(message_ids[1], msgs["cn_message"], bot_token, chat_id)
+
+    return {
+        "success": result1["success"] and result2["success"],
+        "message_ids": message_ids
+    }
