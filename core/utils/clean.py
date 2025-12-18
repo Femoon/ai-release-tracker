@@ -54,6 +54,9 @@ def clean_release_body(body: str) -> str:
     clean = re.sub(r'^#\d+\s+[–—-]\s+.*$', '', clean, flags=re.MULTILINE)
     clean = re.sub(r'^[-*]\s+PR\s*$', '', clean, flags=re.MULTILINE)  # 单独的 "- PR" 行
 
+    # 移除 (PR #xxxx) 格式的引用
+    clean = re.sub(r'\s*\(PR\s*#?\d*\)', '', clean, flags=re.IGNORECASE)
+
     # 移除内联的 PR/Issue 引用（如 #6222, (#6189)）
     clean = re.sub(r'\s*\(#\d+(?:\s+#\d+)*\)', '', clean)
     clean = re.sub(r'#\d+(?:\s+#\d+)*', '', clean)
