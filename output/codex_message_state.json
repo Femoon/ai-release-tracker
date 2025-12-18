@@ -1,7 +1,7 @@
 {
-  "version": "rust-v0.73.0",
+  "version": "rust-v0.74.0",
   "message_ids": [
-    15
+    157
   ],
-  "body_hash": "b42ecdd4bb68202ae4588d2150c4ac02"
+  "body_hash": "544fa7a983c667d27b975e88bf6dd018"
 }
