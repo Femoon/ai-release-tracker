@@ -40,7 +40,8 @@ A monitoring tool for tracking version updates of AI coding tools. Automatically
 ```bash
 git clone https://github.com/your-username/ai-release-tracker.git
 cd ai-release-tracker
-pip install -r requirements.txt
+uv sync
+# or: pip install .
 ```
 
 ### Usage

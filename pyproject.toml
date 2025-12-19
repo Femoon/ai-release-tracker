@@ -1,0 +1,11 @@
+[project]
+name = "ai-release-tracker"
+version = "0.1.0"
+description = "Monitoring tool for tracking version updates of AI coding tools"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "requests>=2.28.0",
+    "python-dotenv>=1.0.0",
+    "litellm>=1.0.0",
+]

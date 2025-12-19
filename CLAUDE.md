@@ -33,9 +33,9 @@ python products/codex/fetcher.py
 ## 依赖
 
 ```bash
-pip install -r requirements.txt
+uv sync
 # 或
-pip install requests python-dotenv litellm
+pip install .
 ```
 
 ## 架构

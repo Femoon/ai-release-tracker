@@ -40,7 +40,8 @@ AI 编码工具版本更新监控工具。自动检查新版本发布，并发�
 ```bash
 git clone https://github.com/your-username/ai-release-tracker.git
 cd ai-release-tracker
-pip install -r requirements.txt
+uv sync
+# 或: pip install .
 ```
 
 ### 使用
