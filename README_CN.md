@@ -91,34 +91,21 @@ uv run python products/codex/fetcher.py
 
 ## 配置
 
-### Telegram 通知
-
-每个工具使用独立的环境变量，可推送到不同的 bot 和频道：
+创建 `.env` 文件配置环境变量（脚本会自动加载）：
 
 ```bash
-# Claude Code 通知配置
-export CLAUDE_CODE_BOT_TOKEN="your_bot_token"
-export CLAUDE_CODE_CHAT_ID="your_chat_id"
+# Telegram 通知（每个工具独立配置，可推送到不同 bot/频道）
+CLAUDE_CODE_BOT_TOKEN=your_bot_token
+CLAUDE_CODE_CHAT_ID=your_chat_id
+CODEX_BOT_TOKEN=your_bot_token
+CODEX_CHAT_ID=your_chat_id
 
-# OpenAI Codex 通知配置
-export CODEX_BOT_TOKEN="your_bot_token"
-export CODEX_CHAT_ID="your_chat_id"
+# AI 翻译（可选，未配置时仅发送英文）
+LLM_API_KEY=your_llm_api_key
+LLM_MODEL=openrouter/google/gemini-2.5-flash  # 可选，指定翻译模型
 ```
 
-未配置时脚本正常运行，仅跳过通知功能。
-
-### AI 翻译
-
-使用 LiteLLM 进行更新内容翻译（支持多种 provider）：
-
-```bash
-export LLM_API_KEY="your_llm_api_key"
-
-# 可选：指定翻译模型，默认 openrouter/google/gemini-2.5-flash
-export LLM_MODEL="openrouter/google/gemini-2.5-flash"
-```
-
-未配置时跳过翻译，仅发送英文原文。
+未配置时脚本正常运行，仅跳过对应功能。
 
 ## GitHub Actions
 
@@ -154,24 +141,7 @@ crontab -e
 0 * * * * cd /path/to/ai-release-tracker && docker compose run --rm version-checker >> /var/log/ai-release-tracker.log 2>&1
 ```
 
-### 环境变量配置
-
-创建 `.env` 文件：
-
-```bash
-# Claude Code
-CLAUDE_CODE_BOT_TOKEN=your_bot_token
-CLAUDE_CODE_CHAT_ID=your_chat_id
-
-# OpenAI Codex
-CODEX_BOT_TOKEN=your_bot_token
-CODEX_CHAT_ID=your_chat_id
-
-# AI 翻译
-LLM_API_KEY=your_llm_api_key
-```
-
-docker-compose 会自动读取 `.env` 文件。
+docker-compose 会自动读取项目根目录的 `.env` 文件。
 
 ## 工作原理
 

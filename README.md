@@ -91,34 +91,21 @@ uv run python products/codex/fetcher.py
 
 ## Configuration
 
-### Telegram Notifications
-
-Each tool uses independent environment variables, allowing notifications to different bots/channels:
+Create a `.env` file to configure environment variables (auto-loaded by scripts):
 
 ```bash
-# Claude Code notifications
-export CLAUDE_CODE_BOT_TOKEN="your_bot_token"
-export CLAUDE_CODE_CHAT_ID="your_chat_id"
+# Telegram notifications (independent config per tool, can use different bots/channels)
+CLAUDE_CODE_BOT_TOKEN=your_bot_token
+CLAUDE_CODE_CHAT_ID=your_chat_id
+CODEX_BOT_TOKEN=your_bot_token
+CODEX_CHAT_ID=your_chat_id
 
-# OpenAI Codex notifications
-export CODEX_BOT_TOKEN="your_bot_token"
-export CODEX_CHAT_ID="your_chat_id"
+# AI Translation (optional, English only if not configured)
+LLM_API_KEY=your_llm_api_key
+LLM_MODEL=openrouter/google/gemini-2.5-flash  # optional, specify translation model
 ```
 
-Scripts run normally without configuration, just skip notifications.
-
-### AI Translation
-
-Uses LiteLLM for changelog translation (supports multiple providers):
-
-```bash
-export LLM_API_KEY="your_llm_api_key"
-
-# Optional: specify translation model (default: openrouter/google/gemini-2.5-flash)
-export LLM_MODEL="openrouter/google/gemini-2.5-flash"
-```
-
-Without configuration, only English content is sent.
+Scripts run normally without configuration, just skip the corresponding features.
 
 ## GitHub Actions
 
@@ -152,22 +139,7 @@ crontab -e
 0 * * * * cd /path/to/ai-release-tracker && docker compose run --rm version-checker >> /var/log/ai-release-tracker.log 2>&1
 ```
 
-### Environment Variables
-
-Create a `.env` file:
-
-```bash
-# Claude Code
-CLAUDE_CODE_BOT_TOKEN=your_bot_token
-CLAUDE_CODE_CHAT_ID=your_chat_id
-
-# OpenAI Codex
-CODEX_BOT_TOKEN=your_bot_token
-CODEX_CHAT_ID=your_chat_id
-
-# AI Translation
-LLM_API_KEY=your_llm_api_key
-```
+docker-compose auto-loads the `.env` file from project root.
 
 ## How It Works
 
