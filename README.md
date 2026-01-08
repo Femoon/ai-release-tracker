@@ -37,35 +37,56 @@ A monitoring tool for tracking version updates of AI coding tools. Automatically
 
 ### Installation
 
+**Requirements:** Python >= 3.14
+
 ```bash
+# Install uv (if not installed)
+# See: https://docs.astral.sh/uv/getting-started/installation/
+# macOS/Linux:
+curl -LsSf https://astral.sh/uv/install.sh | sh
+# Windows:
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# Clone and install dependencies
 git clone https://github.com/your-username/ai-release-tracker.git
 cd ai-release-tracker
 uv sync
-# or: pip install .
 ```
+
+<details>
+<summary>Without uv</summary>
+
+```bash
+git clone https://github.com/your-username/ai-release-tracker.git
+cd ai-release-tracker
+pip install .
+# Then use `python` instead of `uv run python`
+```
+
+</details>
 
 ### Usage
 
 ```bash
 # Check all tools for version updates
-python main.py
+uv run python main.py
 
 # Check Claude Code only
-python products/claude_code/checker.py
+uv run python products/claude_code/checker.py
 
 # Check OpenAI Codex only (excludes alpha versions)
-python products/codex/checker.py
+uv run python products/codex/checker.py
 
 # Batch push Claude Code historical versions to Telegram
-python products/claude_code/pusher.py              # Push 3 versions (default)
-python products/claude_code/pusher.py --count 5    # Push 5 versions
-python products/claude_code/pusher.py --all        # Push all unpushed versions
+uv run python products/claude_code/pusher.py              # Push 3 versions (default)
+uv run python products/claude_code/pusher.py --count 5    # Push 5 versions
+uv run python products/claude_code/pusher.py --all        # Push all unpushed versions
 
 # Batch push OpenAI Codex historical versions to Telegram
-python products/codex/pusher.py
+uv run python products/codex/pusher.py
 
 # Fetch all OpenAI Codex releases
-python products/codex/fetcher.py
+uv run python products/codex/fetcher.py
 ```
 
 ## Configuration

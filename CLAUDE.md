@@ -10,33 +10,43 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 # 运行入口文件，检查所有工具的版本更新
-python main.py
+uv run python main.py
 
 # 单独检查 Claude Code 版本更新
-python products/claude_code/checker.py
+uv run python products/claude_code/checker.py
 
 # 单独检查 OpenAI Codex 版本更新（排除 alpha 版本）
-python products/codex/checker.py
+uv run python products/codex/checker.py
 
 # 批量推送 Claude Code 历史版本到 Telegram（默认推送 3 个）
-python products/claude_code/pusher.py
-python products/claude_code/pusher.py --count 5  # 推送 5 个
-python products/claude_code/pusher.py --all       # 推送所有未推送版本
+uv run python products/claude_code/pusher.py
+uv run python products/claude_code/pusher.py --count 5  # 推送 5 个
+uv run python products/claude_code/pusher.py --all       # 推送所有未推送版本
 
 # 批量推送 OpenAI Codex 历史版本到 Telegram
-python products/codex/pusher.py
+uv run python products/codex/pusher.py
 
 # 获取 OpenAI Codex 所有 releases 信息
-python products/codex/fetcher.py
+uv run python products/codex/fetcher.py
 ```
 
 ## 依赖
 
+**环境要求：** Python >= 3.14
+
 ```bash
+# 安装 uv（如未安装）
+# 参考：https://docs.astral.sh/uv/getting-started/installation/
+# macOS/Linux:
+curl -LsSf https://astral.sh/uv/install.sh | sh
+# Windows:
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# 安装项目依赖
 uv sync
-# 或
-pip install .
 ```
+
+不使用 uv 时：`pip install .`，然后用 `python` 代替 `uv run python`。
 
 ## 架构
 

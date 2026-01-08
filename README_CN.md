@@ -37,35 +37,56 @@ AI 编码工具版本更新监控工具。自动检查新版本发布，并发�
 
 ### 安装
 
+**环境要求：** Python >= 3.14
+
 ```bash
+# 安装 uv（如未安装）
+# 参考：https://docs.astral.sh/uv/getting-started/installation/
+# macOS/Linux:
+curl -LsSf https://astral.sh/uv/install.sh | sh
+# Windows:
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# 克隆并安装依赖
 git clone https://github.com/your-username/ai-release-tracker.git
 cd ai-release-tracker
 uv sync
-# 或: pip install .
 ```
+
+<details>
+<summary>不使用 uv</summary>
+
+```bash
+git clone https://github.com/your-username/ai-release-tracker.git
+cd ai-release-tracker
+pip install .
+# 然后用 `python` 代替 `uv run python`
+```
+
+</details>
 
 ### 使用
 
 ```bash
 # 检查所有工具的版本更新
-python main.py
+uv run python main.py
 
 # 单独检查 Claude Code
-python products/claude_code/checker.py
+uv run python products/claude_code/checker.py
 
 # 单独检查 OpenAI Codex（排除 alpha 版本）
-python products/codex/checker.py
+uv run python products/codex/checker.py
 
 # 批量推送 Claude Code 历史版本到 Telegram
-python products/claude_code/pusher.py              # 推送 3 个版本（默认）
-python products/claude_code/pusher.py --count 5    # 推送 5 个版本
-python products/claude_code/pusher.py --all        # 推送所有未推送版本
+uv run python products/claude_code/pusher.py              # 推送 3 个版本（默认）
+uv run python products/claude_code/pusher.py --count 5    # 推送 5 个版本
+uv run python products/claude_code/pusher.py --all        # 推送所有未推送版本
 
 # 批量推送 OpenAI Codex 历史版本到 Telegram
-python products/codex/pusher.py
+uv run python products/codex/pusher.py
 
 # 获取 OpenAI Codex 所有 releases 信息
-python products/codex/fetcher.py
+uv run python products/codex/fetcher.py
 ```
 
 ## 配置
