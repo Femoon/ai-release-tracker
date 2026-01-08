@@ -10,6 +10,8 @@ services:
       - CODEX_CHAT_ID=${CODEX_CHAT_ID:-}
       - LLM_API_KEY=${LLM_API_KEY:-}
       - LLM_MODEL=${LLM_MODEL:-}
+      - GH_TOKEN=${GH_TOKEN:-}
+      - TELEGRAPH_ACCESS_TOKEN=${TELEGRAPH_ACCESS_TOKEN:-}
     volumes:
       - ./output:/app/output
     restart: "no"
