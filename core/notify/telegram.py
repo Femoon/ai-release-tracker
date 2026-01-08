@@ -226,7 +226,10 @@ def _build_bilingual_messages(
             "en_message": str,      # 英文消息
             "cn_message": str,      # 中文消息
             "combined_message": str, # 合并消息
-            "is_oversized": bool    # 合并消息是否超长
+            "is_oversized": bool,   # 合并消息是否超长
+            "is_single_oversized": bool,  # 单条消息是否超长（需要 Telegraph）
+            "en_title": str,        # 英文标题
+            "cn_title": str         # 中文标题
         }
     """
     # 清理内容
@@ -257,16 +260,26 @@ def _build_bilingual_messages(
         combined_lines.extend(["", translated_clean])
     combined_message = "\n".join(combined_lines)
 
-    # 检测合并消息长度
+    # 检测消息长度
     processed_combined = process_message_for_markdown_v2(combined_message)
+    processed_en = process_message_for_markdown_v2(en_message)
+    processed_cn = process_message_for_markdown_v2(cn_message)
+
     is_oversized = len(processed_combined) > MAX_MESSAGE_LENGTH
+    # 判断单条消息是否超长（任一条超长就需要使用 Telegraph）
+    is_single_oversized = len(processed_en) > MAX_MESSAGE_LENGTH or len(processed_cn) > MAX_MESSAGE_LENGTH
 
     return {
         "en_message": en_message,
         "cn_message": cn_message,
         "combined_message": combined_message,
         "is_oversized": is_oversized,
-        "combined_length": len(processed_combined)
+        "is_single_oversized": is_single_oversized,
+        "combined_length": len(processed_combined),
+        "en_length": len(processed_en),
+        "cn_length": len(processed_cn),
+        "en_title": en_title,
+        "cn_title": cn_title
     }
 
 
@@ -282,8 +295,10 @@ def send_bilingual_notification(
     """
     发送双语通知，自动处理长度限制
 
+    处理策略:
     - 如果双语合并后 <= 4096 字符，发送一条消息
-    - 如果超出限制，分两条发送（英文一条、中文一条）
+    - 如果合并超长但单条 <= 4096，分两条发送（英文一条、中文一条）
+    - 如果单条也超长（> 4096），发布到 Telegraph，发送标题+链接
 
     Args:
         version: 版本号
@@ -295,29 +310,64 @@ def send_bilingual_notification(
         version_url: 版本链接（可选，用于生成超链接标题）
 
     Returns:
-        dict: {"success": bool, "message_ids": list[int]}
+        dict: {"success": bool, "message_ids": list[int], "telegraph_url": str | None}
     """
     msgs = _build_bilingual_messages(version, original, translated, title, version_url)
 
+    # 情况3: 单条消息超长，使用 Telegraph
+    if msgs["is_single_oversized"]:
+        print(f"单条消息超长 (英文: {msgs['en_length']}, 中文: {msgs['cn_length']})，发布到 Telegraph")
+
+        # 导入 Telegraph 模块
+        from core.notify.telegraph import publish_changelog
+
+        # 发布到 Telegraph
+        telegraph_result = publish_changelog(
+            title=title,
+            original=original,
+            translated=translated,
+            version=version
+        )
+
+        if not telegraph_result["success"]:
+            print("Telegraph 发布失败，无法发送通知")
+            return {"success": False, "message_ids": [], "telegraph_url": None}
+
+        # 构建简短的 Telegram 消息（标题 + Telegraph 链接）
+        telegraph_url = telegraph_result["url"]
+        short_message = f"{msgs['en_title']}\n\n[View Full Changelog | 查看完整更新日志]({telegraph_url})"
+
+        result = send_telegram_message(short_message, bot_token, chat_id)
+        message_ids = [result["message_id"]] if result["message_id"] else []
+        return {
+            "success": result["success"],
+            "message_ids": message_ids,
+            "telegraph_url": telegraph_url
+        }
+
+    # 情况1: 长度在限制内，发送合并消息
     if not msgs["is_oversized"]:
-        # 长度在限制内，发送合并消息
         result = send_telegram_message(msgs["combined_message"], bot_token, chat_id)
         message_ids = [result["message_id"]] if result["message_id"] else []
-        return {"success": result["success"], "message_ids": message_ids}
-    else:
-        # 超出限制，分两条发送
-        print(f"消息长度 {msgs['combined_length']} 超出限制，分两条发送")
+        return {"success": result["success"], "message_ids": message_ids, "telegraph_url": None}
 
-        result1 = send_telegram_message(msgs["en_message"], bot_token, chat_id)
-        result2 = send_telegram_message(msgs["cn_message"], bot_token, chat_id)
+    # 情况2: 合并超长但单条不超长，分两条发送
+    print(f"消息长度 {msgs['combined_length']} 超出限制，分两条发送")
 
-        message_ids = []
-        if result1["message_id"]:
-            message_ids.append(result1["message_id"])
-        if result2["message_id"]:
-            message_ids.append(result2["message_id"])
+    result1 = send_telegram_message(msgs["en_message"], bot_token, chat_id)
+    result2 = send_telegram_message(msgs["cn_message"], bot_token, chat_id)
 
-        return {"success": result1["success"] and result2["success"], "message_ids": message_ids}
+    message_ids = []
+    if result1["message_id"]:
+        message_ids.append(result1["message_id"])
+    if result2["message_id"]:
+        message_ids.append(result2["message_id"])
+
+    return {
+        "success": result1["success"] and result2["success"],
+        "message_ids": message_ids,
+        "telegraph_url": None
+    }
 
 
 def edit_bilingual_notification(

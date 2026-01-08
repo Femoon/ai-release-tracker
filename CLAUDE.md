@@ -91,6 +91,21 @@ export LLM_MODEL="openrouter/google/gemini-2.5-flash"
 
 未配置时跳过翻译，仅发送英文原文。
 
+## Telegraph 长文发布配置（可选）
+
+当更新日志内容超过 Telegram 消息长度限制（4096字符）时，系统会自动将内容发布到 Telegraph，并在 Telegram 发送文章链接。
+
+```bash
+# Telegraph 配置（必需，用于发布长文）
+export TELEGRAPH_ACCESS_TOKEN="your_telegraph_token"
+
+# 可选：自定义文章署名
+export TELEGRAPH_AUTHOR_NAME="AI Release Tracker"
+export TELEGRAPH_AUTHOR_URL="https://t.me/your_channel"
+```
+
+未配置时跳过 Telegraph 发布，超长消息将发送失败。
+
 ## GitHub API 配置（可选）
 
 用于 codex checker 和 fetcher 访问 GitHub API，避免速率限制：
