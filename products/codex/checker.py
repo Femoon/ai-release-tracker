@@ -515,7 +515,8 @@ def main():
                     # 更新 body_hash 和可能变化的 message_ids
                     save_message_state(latest_tag, edit_result["message_ids"], current_body_hash)
                 else:
-                    print("消息编辑失败，可能消息已被删除")
+                    print("⚠️  消息编辑失败，可能消息已被删除")
+                    return 1
 
         # 如果刚刚解析了旧格式，更新版本文件
         if was_resolved:
@@ -567,8 +568,13 @@ def main():
             version_url=release_link
         )
 
+        # 检查通知是否发送成功
+        if not notify_result["success"]:
+            print("⚠️  Telegram 通知发送失败")
+            return 1
+
         # 保存消息状态（用于后续 body 更新时编辑消息）
-        if notify_result["success"] and notify_result["message_ids"]:
+        if notify_result["message_ids"]:
             body_hash = compute_body_hash(latest_content)
             save_message_state(latest_tag, notify_result["message_ids"], body_hash)
             print(f"消息状态已保存 (message_ids: {notify_result['message_ids']})")
@@ -577,7 +583,6 @@ def main():
 
 
 if __name__ == "__main__":
-    import sys
     exit_code = main()
     if exit_code:
         sys.exit(exit_code)

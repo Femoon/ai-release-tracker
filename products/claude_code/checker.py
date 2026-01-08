@@ -105,13 +105,13 @@ def main():
     # 获取最新的 CHANGELOG
     changelog = fetch_changelog()
     if not changelog:
-        return
+        return 1
 
     # 解析最新版本
     latest_version, latest_content = parse_latest_version(changelog)
     if not latest_version:
         print("无法解析版本信息")
-        return
+        return 1
 
     print(f"远程最新版本: {latest_version}")
 
@@ -122,9 +122,11 @@ def main():
         # 首次运行
         print(f"首次运行，已记录版本 {latest_version}")
         save_version(latest_version)
+        return 0
     elif saved_version == latest_version:
         # 版本相同
         print(f"当前已是最新版本 ({latest_version})")
+        return 0
     else:
         # 有新版本
         print(f"发现新版本！ {saved_version} → {latest_version}")
@@ -137,7 +139,7 @@ def main():
 
         # 发送 Telegram 通知
         translated = translate_changelog(latest_content)
-        send_bilingual_notification(
+        notify_result = send_bilingual_notification(
             version=latest_version,
             original=latest_content,
             translated=translated,
@@ -146,6 +148,15 @@ def main():
             chat_id=TELEGRAM_CHAT_ID
         )
 
+        # 检查通知是否发送成功
+        if not notify_result["success"]:
+            print("⚠️  Telegram 通知发送失败")
+            return 1
+
+        return 0
+
 
 if __name__ == "__main__":
-    main()
+    exit_code = main()
+    if exit_code:
+        sys.exit(exit_code)
