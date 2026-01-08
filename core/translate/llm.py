@@ -31,16 +31,22 @@ def translate_changelog(
         print("翻译配置未设置，跳过翻译")
         return ""
 
-    prompt = f"""请将以下软件更新日志翻译成中文。要求：
-1. 保持 Markdown 格式不变
-2. 技术术语可保留英文（如 API、SDK、CLI 等）
-3. 版本号、代码、命令等保持原样
-4. 翻译要准确、通顺
+    prompt = f"""请将以下软件更新日志翻译成中文，直接输出翻译结果，不要输出任何解释或前缀。
 
-原文：
-{content}
+翻译要求：
+1. 保持 Markdown 格式不变（标题、列表、代码块等）
+2. 版本号、代码片段、命令保持原样
+3. 以下术语必须保留英文原文，不要翻译：
+   - 通用术语：API, SDK, CLI, Token, Context Window, OAuth, WebSocket, Streaming, LLM, Prompt
+   - 功能名称：Agent, Subagent, Sub-agent, Skill, Hook, Plugin, Plan Mode, Compact Mode, Background Task, Memory, TUI, Sandbox, Transcript Mode
+   - 命令：/compact, /context, /permissions, /mcp, /model, /resume, /export, /stats, /init, /prompts, /approvals
+   - 工具与概念：MCP, Model Context Protocol, Tool Use, Tool Call, Bash Tool, Permission, Thinking Block, Frontmatter, exec_command, apply_patch, prompt cache, reasoning effort
+   - 配置文件：settings.json, CLAUDE.md, config.toml, AGENTS.md, .mcp.json
+4. 语言流畅自然，符合中文技术文档习惯
+5. 对于不确定的专有名词，保留英文
 
-中文翻译："""
+待翻译内容：
+{content}"""
 
     try:
         response = completion(
