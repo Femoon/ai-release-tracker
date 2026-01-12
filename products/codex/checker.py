@@ -124,12 +124,37 @@ def verify_release_via_api(tag_name):
     return data, "stable"
 
 
+def sanitize_xml(xml_text):
+    """清理 XML 中的非法字符
+
+    XML 1.0 只允许以下字符:
+    #x9 | #xA | #xD | [#x20-#xD7FF] | [#xE000-#xFFFD] | [#x10000-#x10FFFF]
+    """
+    def is_valid_xml_char(char):
+        code = ord(char)
+        return (
+            code == 0x9 or
+            code == 0xA or
+            code == 0xD or
+            (0x20 <= code <= 0xD7FF) or
+            (0xE000 <= code <= 0xFFFD) or
+            (0x10000 <= code <= 0x10FFFF)
+        )
+
+    cleaned = ''.join(c for c in xml_text if is_valid_xml_char(c))
+    if len(cleaned) != len(xml_text):
+        removed_count = len(xml_text) - len(cleaned)
+        print(f"  [清理] 移除了 {removed_count} 个非法 XML 字符")
+    return cleaned
+
+
 def fetch_releases_feed():
     """从 GitHub 获取 releases Atom feed"""
     try:
         response = requests.get(RELEASES_ATOM_URL, timeout=10)
         response.raise_for_status()
-        return response.text, None
+        # 清理非法 XML 字符（如 Form Feed \x0c 等）
+        return sanitize_xml(response.text), None
     except requests.RequestException as e:
         print(f"获取 releases feed 失败: {e}")
         return None, f"fetch_feed_error: {e}"
