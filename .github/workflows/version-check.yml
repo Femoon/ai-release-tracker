@@ -50,6 +50,8 @@ jobs:
           # AI 翻译配置
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_MODEL: ${{ vars.LLM_MODEL }}
+          # Telegraph 长文发布配置
+          TELEGRAPH_ACCESS_TOKEN: ${{ secrets.TELEGRAPH_ACCESS_TOKEN }}
         run: uv run python main.py
 
       - name: Commit version updates
