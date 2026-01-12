@@ -19,6 +19,8 @@ load_dotenv()
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from core.notify.telegram import send_bilingual_notification
 from core.translate import translate_changelog
+from core.utils import clean_release_body
+from products.codex.fetcher import fetch_all_releases
 
 # 配置
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -103,29 +105,57 @@ def append_pushed_version(version):
         return False
 
 
-def main(max_count=3, push_all=False):
+def main(max_count=3, push_all=False, force=False):
     """
     主函数
     max_count: 最多推送版本数量
     push_all: 是否推送所有未推送版本
+    force: 忽略已推送检查，直接推送（测试用）
     """
     print("OpenAI Codex 历史版本批量推送")
     print("=" * 50)
 
-    # 从文件读取版本
-    print(f"读取文件: {RELEASES_FILE}")
-    all_releases = parse_releases_file(RELEASES_FILE)
-    print(f"共 {len(all_releases)} 个版本")
+    # 过滤待推送版本
+    if force:
+        # 强制模式：从 GitHub API 获取最新版本
+        print("强制模式：从 GitHub API 获取最新版本...")
+        api_releases = fetch_all_releases()
+        if not api_releases:
+            print("从 GitHub API 获取版本失败")
+            return
+        # 转换为 pusher 需要的格式，按发布时间从新到旧排序
+        all_releases = [
+            {
+                "name": r.get("name") or r.get("tag_name", ""),
+                "body": clean_release_body(r.get("body", "")),
+                "url": r.get("html_url", "")
+            }
+            for r in sorted(api_releases, key=lambda x: x.get("published_at", ""), reverse=True)
+        ]
+        # 过滤 beta/alpha 版本
+        pending_releases = [
+            r for r in all_releases
+            if "beta" not in r["name"].lower() and "alpha" not in r["name"].lower()
+        ]
+        print(f"共 {len(api_releases)} 个版本，过滤后 {len(pending_releases)} 个")
+        print(f"强制模式：跳过已推送检查")
+    else:
+        # 正常模式：从本地文件读取版本
+        print(f"读取文件: {RELEASES_FILE}")
+        all_releases = parse_releases_file(RELEASES_FILE)
+        print(f"共 {len(all_releases)} 个版本")
 
-    # 读取已推送版本
-    pushed_versions = read_pushed_versions()
-    print(f"已推送 {len(pushed_versions)} 个版本")
+        # 读取已推送版本
+        pushed_versions = read_pushed_versions()
+        print(f"已推送 {len(pushed_versions)} 个版本")
+        # 过滤未推送版本（排除 beta/alpha 版本）
+        pending_releases = [
+            r for r in all_releases
+            if r["name"] not in pushed_versions
+            and "beta" not in r["name"].lower()
+            and "alpha" not in r["name"].lower()
+        ]
 
-    # 过滤未推送版本（排除 beta 版本）
-    pending_releases = [
-        r for r in all_releases
-        if r["name"] not in pushed_versions and "beta" not in r["name"].lower()
-    ]
     print(f"待推送 {len(pending_releases)} 个版本")
 
     if not pending_releases:
@@ -177,8 +207,9 @@ def main(max_count=3, push_all=False):
                 break
 
         if result["success"]:
-            # 记录已推送
-            append_pushed_version(version)
+            # 强制模式不更新记录
+            if not force:
+                append_pushed_version(version)
             success_count += 1
             print(f"  [OK] 版本 {version} 推送成功")
         else:
@@ -197,6 +228,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="OpenAI Codex 历史版本批量推送")
     parser.add_argument("--count", type=int, default=3, help="推送版本数量（默认 3）")
     parser.add_argument("--all", action="store_true", help="推送所有未推送版本")
+    parser.add_argument("-f", "--force", action="store_true", help="忽略已推送检查，直接推送（测试用，不更新记录）")
 
     args = parser.parse_args()
-    main(max_count=args.count, push_all=args.all)
+    main(max_count=args.count, push_all=args.all, force=args.force)

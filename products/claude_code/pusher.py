@@ -109,11 +109,12 @@ def append_pushed_version(version):
         return False
 
 
-def main(max_count=3, push_all=False):
+def main(max_count=3, push_all=False, force=False):
     """
     主函数
     max_count: 最多推送版本数量
     push_all: 是否推送所有未推送版本
+    force: 忽略已推送检查，直接推送（测试用）
     """
     print("Claude Code 历史版本批量推送")
     print("=" * 50)
@@ -126,12 +127,17 @@ def main(max_count=3, push_all=False):
     all_versions = parse_all_versions(changelog)
     print(f"共 {len(all_versions)} 个版本")
 
-    # 读取已推送版本
-    pushed_versions = read_pushed_versions()
-    print(f"已推送 {len(pushed_versions)} 个版本")
+    # 过滤待推送版本
+    if force:
+        # 强制模式：跳过已推送检查，从新到旧排序（推送最新版本）
+        pending_versions = list(reversed(all_versions))
+        print(f"强制模式：跳过已推送检查")
+    else:
+        # 正常模式：读取已推送版本
+        pushed_versions = read_pushed_versions()
+        print(f"已推送 {len(pushed_versions)} 个版本")
+        pending_versions = [(v, c) for v, c in all_versions if v not in pushed_versions]
 
-    # 过滤未推送版本
-    pending_versions = [(v, c) for v, c in all_versions if v not in pushed_versions]
     print(f"待推送 {len(pending_versions)} 个版本")
 
     if not pending_versions:
@@ -175,8 +181,9 @@ def main(max_count=3, push_all=False):
                 break
 
         if result["success"]:
-            # 记录已推送
-            append_pushed_version(version)
+            # 强制模式不更新记录
+            if not force:
+                append_pushed_version(version)
             success_count += 1
             print(f"  [OK] 版本 {version} 推送成功")
         else:
@@ -195,6 +202,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Claude Code 历史版本批量推送")
     parser.add_argument("--count", type=int, default=3, help="推送版本数量（默认 3）")
     parser.add_argument("--all", action="store_true", help="推送所有未推送版本")
+    parser.add_argument("-f", "--force", action="store_true", help="忽略已推送检查，直接推送（测试用，不更新记录）")
 
     args = parser.parse_args()
-    main(max_count=args.count, push_all=args.all)
+    main(max_count=args.count, push_all=args.all, force=args.force)
