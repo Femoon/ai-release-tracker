@@ -67,6 +67,11 @@ def main():
     print(f"检查完成: {success_count}/{len(CHECKERS)} 个工具检查成功")
     print("=" * 50)
 
+    # 有检查失败时返回非零退出码，让 CI 能正确识别失败
+    failed_count = len(CHECKERS) - success_count
+    if failed_count > 0:
+        sys.exit(failed_count)
+
 
 if __name__ == "__main__":
     main()
