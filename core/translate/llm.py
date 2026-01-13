@@ -5,7 +5,41 @@
 """
 
 import os
+import re
 from litellm import completion
+
+
+# 翻译质量检查：中文字符最低占比
+MIN_CHINESE_RATIO = 0.15  # 15%
+# 最大重试次数
+MAX_RETRIES = 2
+
+
+def _count_chinese_chars(text: str) -> int:
+    """统计中文字符数量"""
+    chinese_pattern = re.compile(r'[\u4e00-\u9fff]')
+    return len(chinese_pattern.findall(text))
+
+
+def _check_translation_quality(translated: str) -> bool:
+    """
+    检查翻译质量
+
+    Returns:
+        bool: True 表示翻译有效，False 表示翻译失败（返回了英文原文）
+    """
+    if not translated:
+        return False
+
+    chinese_count = _count_chinese_chars(translated)
+    total_length = len(translated)
+
+    if total_length == 0:
+        return False
+
+    chinese_ratio = chinese_count / total_length
+
+    return chinese_ratio >= MIN_CHINESE_RATIO
 
 
 def translate_changelog(
@@ -57,19 +91,37 @@ def translate_changelog(
 待翻译内容：
 {content}"""
 
-    try:
-        response = completion(
-            model=model,
-            api_key=api_key,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.3,
-        )
-        if not response.choices or len(response.choices) == 0:
-            print("翻译失败: API 返回空结果")
-            return ""
-        translated = response.choices[0].message.content.strip()
-        print("翻译完成")
-        return translated
-    except Exception as e:
-        print(f"翻译失败: {e}")
-        return ""
+    for attempt in range(MAX_RETRIES + 1):
+        try:
+            response = completion(
+                model=model,
+                api_key=api_key,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3,
+            )
+            if not response.choices or len(response.choices) == 0:
+                print("翻译失败: API 返回空结果")
+                continue
+
+            translated = response.choices[0].message.content.strip()
+
+            # 检查翻译质量
+            if _check_translation_quality(translated):
+                chinese_count = _count_chinese_chars(translated)
+                chinese_ratio = chinese_count / len(translated) * 100
+                print(f"翻译完成 (中文占比: {chinese_ratio:.1f}%)")
+                return translated
+            else:
+                chinese_count = _count_chinese_chars(translated)
+                chinese_ratio = chinese_count / len(translated) * 100 if translated else 0
+                print(f"翻译质量不合格 (中文占比: {chinese_ratio:.1f}%，要求 >= {MIN_CHINESE_RATIO * 100}%)")
+                if attempt < MAX_RETRIES:
+                    print(f"重试翻译 ({attempt + 2}/{MAX_RETRIES + 1})...")
+
+        except Exception as e:
+            print(f"翻译失败: {e}")
+            if attempt < MAX_RETRIES:
+                print(f"重试翻译 ({attempt + 2}/{MAX_RETRIES + 1})...")
+
+    print("翻译失败: 已达到最大重试次数")
+    return ""
