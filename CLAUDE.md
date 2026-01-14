@@ -14,9 +14,11 @@ uv run python main.py
 
 # 单独检查 Claude Code 版本更新
 uv run python products/claude_code/checker.py
+uv run python products/claude_code/checker.py --force  # 强制推送最新版本（测试用，不更新记录）
 
 # 单独检查 OpenAI Codex 版本更新（排除 alpha 版本）
 uv run python products/codex/checker.py
+uv run python products/codex/checker.py --force        # 强制推送最新版本（测试用，不更新记录）
 
 # 批量推送 Claude Code 历史版本到 Telegram（默认推送 3 个）
 uv run python products/claude_code/pusher.py
