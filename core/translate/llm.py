@@ -78,9 +78,8 @@ def translate_changelog(
 1. 保持 Markdown 格式不变（标题、列表、代码块等）
 2. 版本号、行内代码保持原样
 3. 以下内容保留英文原文：
-   - commit 类型前缀：fix, feat, chore, docs, refactor, test, style, perf, ci, build, revert
    - GitHub 用户名：@xxx 格式保持不变
-   - 通用术语：API, SDK, CLI, Token, Context Window, OAuth, WebSocket, Streaming, LLM, Prompt
+   - 通用术语：API, SDK, CLI, Token, OAuth, WebSocket, Streaming, LLM, Prompt
    - 功能名称：Agent, Subagent, Sub-agent, Skill, Hook, Plugin, Plan Mode, Compact Mode, Background Task, Memory, TUI, Sandbox, Transcript Mode
    - 斜杠命令：/compact, /context, /permissions, /mcp, /model, /resume, /export, /stats, /init, /prompts, /approvals
    - 工具与概念：MCP, Model Context Protocol, Tool Use, Tool Call, Bash Tool, Permission, Thinking Block, Frontmatter, exec_command, apply_patch, prompt cache, reasoning effort
