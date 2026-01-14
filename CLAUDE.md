@@ -22,12 +22,9 @@ uv run python products/codex/checker.py
 uv run python products/claude_code/pusher.py
 uv run python products/claude_code/pusher.py --count 5  # 推送 5 个
 uv run python products/claude_code/pusher.py --all       # 推送所有未推送版本
-uv run python products/claude_code/pusher.py --force     # 强制推送最新版本（测试用，不更新记录）
-uv run python products/claude_code/pusher.py -f --count 3  # 强制推送最新 3 个版本
 
 # 批量推送 OpenAI Codex 历史版本到 Telegram
 uv run python products/codex/pusher.py
-uv run python products/codex/pusher.py --force           # 强制推送最新版本（测试用，不更新记录）
 
 # 获取 OpenAI Codex 所有 releases 信息
 uv run python products/codex/fetcher.py
