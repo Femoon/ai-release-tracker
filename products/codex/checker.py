@@ -5,6 +5,7 @@ OpenAI Codex 版本更新检查脚本
 从 GitHub releases Atom feed 拉取，检查是否有新的稳定版本发布（排除 alpha 版本）
 """
 
+import argparse
 import os
 import re
 import sys
@@ -429,6 +430,11 @@ def resolve_saved_version_to_tag(saved_version):
 
 
 def main():
+    parser = argparse.ArgumentParser(description="OpenAI Codex 版本更新检查脚本")
+    parser.add_argument("-f", "--force", action="store_true",
+                       help="强制推送最新版本（跳过版本比对，不更新记录）")
+    args = parser.parse_args()
+
     print("正在检查 OpenAI Codex 更新...")
     print("-" * 50)
 
@@ -471,6 +477,43 @@ def main():
     print(f"Tag: {latest_tag}")
     if release_link:
         print(f"链接: {release_link}")
+
+    # 强制模式：直接推送，不比对，不更新记录
+    if args.force:
+        print("-" * 50)
+        print("强制模式：直接推送最新版本")
+        print("-" * 50)
+        if latest_content:
+            print("更新内容：")
+            try:
+                print(latest_content)
+            except UnicodeEncodeError:
+                print("(内容包含特殊字符，已跳过终端显示)")
+        else:
+            print("（暂无更新说明）")
+        print("-" * 50)
+
+        # 翻译更新内容
+        original_content = latest_content or "（暂无更新说明）"
+        translated = translate_changelog(latest_content) if latest_content else ""
+
+        # 发送 Telegram 通知
+        notify_result = send_bilingual_notification(
+            version=latest_title,
+            original=original_content,
+            translated=translated,
+            title="OpenAI Codex",
+            bot_token=TELEGRAM_BOT_TOKEN,
+            chat_id=TELEGRAM_CHAT_ID,
+            version_url=release_link
+        )
+
+        if not notify_result["success"]:
+            print("⚠️  Telegram 通知发送失败")
+            return 1
+
+        print("✓ 推送完成（强制模式，未更新本地记录）")
+        return 0
 
     # 读取本地保存的版本
     saved_version = read_saved_version()
