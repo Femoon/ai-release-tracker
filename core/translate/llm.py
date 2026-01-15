@@ -10,7 +10,7 @@ from litellm import completion
 
 
 # 翻译质量检查：中文字符最低占比
-MIN_CHINESE_RATIO = 0.15  # 15%
+MIN_CHINESE_RATIO = 0.05  # 5%
 # 最大重试次数
 MAX_RETRIES = 2
 

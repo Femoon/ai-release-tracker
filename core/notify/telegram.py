@@ -384,6 +384,7 @@ def edit_bilingual_notification(
     编辑已发送的双语通知
 
     处理策略:
+    - 单条消息也超长: 发布到 Telegraph，编辑为短链接消息
     - 1条消息 + 内容不超长: 直接编辑
     - 1条消息 + 内容超长: 编辑为英文，新发中文
     - 2条消息: 分别编辑英文和中文
@@ -406,6 +407,37 @@ def edit_bilingual_notification(
         return {"success": False, "message_ids": []}
 
     msgs = _build_bilingual_messages(version, original, translated, title, version_url)
+    # 单条消息也超长，改用 Telegraph 处理
+    if msgs["is_single_oversized"]:
+        print(f"单条消息超长 (英文: {msgs['en_length']}, 中文: {msgs['cn_length']})，发布到 Telegraph")
+
+        from core.notify.telegraph import publish_changelog
+
+        telegraph_result = publish_changelog(
+            title=title,
+            original=original,
+            translated=translated,
+            version=version
+        )
+
+        if not telegraph_result["success"]:
+            print("Telegraph 发布失败，无法编辑通知")
+            return {"success": False, "message_ids": []}
+
+        telegraph_url = telegraph_result["url"]
+        short_en = f"{msgs['en_title']}\n\n[View Full Changelog | 查看完整更新日志]({telegraph_url})"
+        short_cn = f"{msgs['cn_title']}\n\n[查看完整更新日志]({telegraph_url})"
+
+        edit_results = []
+        for idx, message_id in enumerate(message_ids):
+            message = short_en if idx == 0 else short_cn
+            edit_results.append(edit_telegram_message(message_id, message, bot_token, chat_id))
+
+        success = all(result["success"] for result in edit_results)
+        return {
+            "success": success,
+            "message_ids": message_ids if success else []
+        }
     is_single_message = len(message_ids) == 1
 
     # 情况1: 原本是单条消息
