@@ -72,7 +72,13 @@ def translate_changelog(
 - 每个列表项（以 - 或 • 开头的行）必须单独翻译，不能合并成段落
 - 保持原文的结构和格式不变，翻译后的行数应与原文基本一致
 - 不要添加标题、摘要或任何原文没有的内容
-- Changelog/commit 条目也必须翻译！格式如 "- fix: xxx" 翻译为 "- fix: 中文描述"，保留前缀(fix/feat/chore等)，翻译描述部分
+
+翻译示例（必须遵守）：
+- "• Added new feature" → "• 新增功能"
+- "• Fixed bug in API" → "• 修复 API 中的错误"
+- "• Changed default behavior" → "• 变更默认行为"
+- "• Removed deprecated option" → "• 移除已弃用的选项"
+- "- fix: resolve issue" → "- fix: 解决问题"（commit 前缀 fix/feat/chore 等保留英文）
 
 格式要求：
 1. 保持 Markdown 格式不变（标题、列表、代码块等）
