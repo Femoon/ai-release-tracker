@@ -361,6 +361,20 @@ def save_message_state(version, message_ids, body_hash):
         return False
 
 
+def clear_message_state():
+    """
+    清理消息状态文件（用于消息已删除等无法恢复的情况）
+    """
+    try:
+        if os.path.exists(MESSAGE_STATE_FILE):
+            os.remove(MESSAGE_STATE_FILE)
+            print("消息状态已清理")
+        return True
+    except Exception as e:
+        print(f"清理消息状态失败: {e}")
+        return False
+
+
 def resolve_saved_version_to_tag(saved_version):
     """
     尝试将保存的版本（可能是 title）解析为 tag name
@@ -581,9 +595,12 @@ def main():
                 if edit_result["success"]:
                     print("消息编辑成功")
                     # 更新 body_hash 和可能变化的 message_ids
-                    save_message_state(latest_tag, edit_result["message_ids"], current_body_hash)
+                    if not save_message_state(latest_tag, edit_result["message_ids"], current_body_hash):
+                        print("⚠️ 消息状态保存失败（不影响主流程）")
                 else:
                     print("⚠️  消息编辑失败，可能消息已被删除")
+                    # 清理无效状态，避免下次重复尝试编辑已删除的消息
+                    clear_message_state()
                     return 1
 
         # 如果刚刚解析了旧格式，更新版本文件
@@ -604,7 +621,9 @@ def main():
         else:
             print("（暂无更新说明）")
         print("-" * 50)
-        save_version(latest_tag)
+        if not save_version(latest_tag):
+            print("⚠️ 版本记录保存失败，停止推送以避免重复")
+            return 1
         print("版本信息已更新")
 
         # 翻译更新内容
@@ -613,17 +632,20 @@ def main():
 
         # 调试：将内容写入本地文件
         debug_output = os.path.join(PROJECT_ROOT, "output", "codex_debug_content.txt")
-        with open(debug_output, 'w', encoding='utf-8') as f:
-            f.write(f"Tag: {latest_tag}\n")
-            f.write(f"Title: {latest_title}\n")
-            f.write(f"链接: {release_link}\n")
-            f.write("=" * 50 + "\n")
-            f.write("原文:\n")
-            f.write(original_content + "\n")
-            f.write("=" * 50 + "\n")
-            f.write("翻译:\n")
-            f.write(translated + "\n")
-        print(f"调试内容已保存到: {debug_output}")
+        try:
+            with open(debug_output, 'w', encoding='utf-8') as f:
+                f.write(f"Tag: {latest_tag}\n")
+                f.write(f"Title: {latest_title}\n")
+                f.write(f"链接: {release_link}\n")
+                f.write("=" * 50 + "\n")
+                f.write("原文:\n")
+                f.write(original_content + "\n")
+                f.write("=" * 50 + "\n")
+                f.write("翻译:\n")
+                f.write(translated + "\n")
+            print(f"调试内容已保存到: {debug_output}")
+        except Exception as e:
+            print(f"⚠️ 调试文件写入失败: {e}（不影响主流程）")
 
         # 发送 Telegram 通知
         notify_result = send_bilingual_notification(
@@ -644,8 +666,10 @@ def main():
         # 保存消息状态（用于后续 body 更新时编辑消息）
         if notify_result["message_ids"]:
             body_hash = compute_body_hash(latest_content)
-            save_message_state(latest_tag, notify_result["message_ids"], body_hash)
-            print(f"消息状态已保存 (message_ids: {notify_result['message_ids']})")
+            if not save_message_state(latest_tag, notify_result["message_ids"], body_hash):
+                print("⚠️ 消息状态保存失败（不影响主流程）")
+            else:
+                print(f"消息状态已保存 (message_ids: {notify_result['message_ids']})")
 
         return 0
 

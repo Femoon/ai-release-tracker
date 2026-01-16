@@ -173,7 +173,9 @@ def main():
         except UnicodeEncodeError:
             print("(内容包含特殊字符，已跳过终端显示)")
         print("-" * 50)
-        save_version(latest_version)
+        if not save_version(latest_version):
+            print("⚠️ 版本记录保存失败，停止推送以避免重复")
+            return 1
         print("版本信息已更新")
 
         # 发送 Telegram 通知
