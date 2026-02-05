@@ -323,9 +323,16 @@ def send_bilingual_notification(
             print("Telegraph 发布失败，无法发送通知")
             return {"success": False, "message_ids": [], "telegraph_url": None}
 
-        # 构建简短的 Telegram 消息（标题 + Telegraph 链接）
+        # 生成更新亮点摘要
+        from core.translate import generate_highlights
+        highlights = generate_highlights(original)
+
+        # 构建简短的 Telegram 消息（标题 + 亮点 + Telegraph 链接）
         telegraph_url = telegraph_result["url"]
-        short_message = f"{msgs['en_title']}\n\n[View Full Changelog | 查看完整更新日志]({telegraph_url})"
+        if highlights:
+            short_message = f"{msgs['en_title']}\n\n*更新亮点*\n{highlights}\n\n[View Full Changelog | 查看完整更新日志]({telegraph_url})"
+        else:
+            short_message = f"{msgs['en_title']}\n\n[View Full Changelog | 查看完整更新日志]({telegraph_url})"
 
         result = send_telegram_message(short_message, bot_token, chat_id)
         message_ids = [result["message_id"]] if result["message_id"] else []
@@ -395,9 +402,17 @@ def edit_bilingual_notification(
             print("Telegraph 发布失败，无法编辑通知")
             return {"success": False, "message_ids": []}
 
+        # 生成更新亮点摘要
+        from core.translate import generate_highlights
+        highlights = generate_highlights(original)
+
         telegraph_url = telegraph_result["url"]
-        short_en = f"{msgs['en_title']}\n\n[View Full Changelog | 查看完整更新日志]({telegraph_url})"
-        short_cn = f"{msgs['cn_title']}\n\n[查看完整更新日志]({telegraph_url})"
+        if highlights:
+            short_en = f"{msgs['en_title']}\n\n*更新亮点*\n{highlights}\n\n[View Full Changelog | 查看完整更新日志]({telegraph_url})"
+            short_cn = f"{msgs['cn_title']}\n\n*更新亮点*\n{highlights}\n\n[查看完整更新日志]({telegraph_url})"
+        else:
+            short_en = f"{msgs['en_title']}\n\n[View Full Changelog | 查看完整更新日志]({telegraph_url})"
+            short_cn = f"{msgs['cn_title']}\n\n[查看完整更新日志]({telegraph_url})"
 
         edit_results = []
         for idx, message_id in enumerate(message_ids):
