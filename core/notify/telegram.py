@@ -288,7 +288,7 @@ def send_bilingual_notification(
 
     处理策略:
     - 如果双语合并后 <= 4096 字符，发送一条消息
-    - 如果合并超长（> 4096），发布到 Telegraph，发送标题+链接
+    - 如果合并超长（> 4096），发布到 Telegraph，发送标题 + AI 总结 + 链接
 
     Args:
         version: 版本号
@@ -304,14 +304,14 @@ def send_bilingual_notification(
     """
     msgs = _build_bilingual_messages(version, original, translated, title, version_url)
 
-    # 消息超长，使用 Telegraph
+    # 消息超长，使用 Telegraph + AI 总结
     if msgs["is_oversized"]:
         print(f"消息超长 ({msgs['combined_length']} 字符)，发布到 Telegraph")
 
-        # 导入 Telegraph 模块
         from core.notify.telegraph import publish_changelog
+        from core.translate.llm import summarize_changelog
 
-        # 发布到 Telegraph
+        # Telegraph：发布完整中英文对照（上游已去掉 Changelog）
         telegraph_result = publish_changelog(
             title=title,
             original=original,
@@ -323,19 +323,20 @@ def send_bilingual_notification(
             print("Telegraph 发布失败，无法发送通知")
             return {"success": False, "message_ids": [], "telegraph_url": None}
 
-        # 生成更新亮点摘要
-        from core.translate import generate_highlights
-        highlights = generate_highlights(original)
-
-        # 构建简短的 Telegram 消息（标题 + 亮点 + Telegraph 链接）
         telegraph_url = telegraph_result["url"]
-        if highlights:
-            short_message = f"{msgs['en_title']}\n\n*更新亮点*\n{highlights}\n\n[View Full Changelog | 查看完整更新日志]({telegraph_url})"
-        else:
-            short_message = f"{msgs['en_title']}\n\n[View Full Changelog | 查看完整更新日志]({telegraph_url})"
 
-        result = send_telegram_message(short_message, bot_token, chat_id)
+        # TG 消息：AI 生成简短总结 + Telegraph 链接
+        summary = summarize_changelog(original)
+        link_line = f"\n\n[View Full Changelog | 查看完整更新日志]({telegraph_url})"
+
+        if summary:
+            message = f"{msgs['en_title']}\n\n{summary}{link_line}"
+        else:
+            message = f"{msgs['en_title']}{link_line}"
+
+        result = send_telegram_message(message, bot_token, chat_id)
         message_ids = [result["message_id"]] if result["message_id"] else []
+
         return {
             "success": result["success"],
             "message_ids": message_ids,
@@ -390,6 +391,7 @@ def edit_bilingual_notification(
         print(f"消息超长 ({msgs['combined_length']} 字符)，发布到 Telegraph")
 
         from core.notify.telegraph import publish_changelog
+        from core.translate.llm import summarize_changelog
 
         telegraph_result = publish_changelog(
             title=title,
@@ -402,22 +404,24 @@ def edit_bilingual_notification(
             print("Telegraph 发布失败，无法编辑通知")
             return {"success": False, "message_ids": []}
 
-        # 生成更新亮点摘要
-        from core.translate import generate_highlights
-        highlights = generate_highlights(original)
-
         telegraph_url = telegraph_result["url"]
-        if highlights:
-            short_en = f"{msgs['en_title']}\n\n*更新亮点*\n{highlights}\n\n[View Full Changelog | 查看完整更新日志]({telegraph_url})"
-            short_cn = f"{msgs['cn_title']}\n\n*更新亮点*\n{highlights}\n\n[查看完整更新日志]({telegraph_url})"
+
+        # AI 生成简短总结
+        summary = summarize_changelog(original)
+        link_line = f"\n\n[View Full Changelog | 查看完整更新日志]({telegraph_url})"
+
+        if summary:
+            short_message = f"{msgs['en_title']}\n\n{summary}{link_line}"
         else:
-            short_en = f"{msgs['en_title']}\n\n[View Full Changelog | 查看完整更新日志]({telegraph_url})"
-            short_cn = f"{msgs['cn_title']}\n\n[查看完整更新日志]({telegraph_url})"
+            short_message = f"{msgs['en_title']}{link_line}"
 
         edit_results = []
         for idx, message_id in enumerate(message_ids):
-            message = short_en if idx == 0 else short_cn
-            edit_results.append(edit_telegram_message(message_id, message, bot_token, chat_id))
+            if idx == 0:
+                edit_results.append(edit_telegram_message(message_id, short_message, bot_token, chat_id))
+            else:
+                merge_notice = f"*{title} {version}*\n\n已合并至上一条消息 ↑"
+                edit_results.append(edit_telegram_message(message_id, merge_notice, bot_token, chat_id))
 
         success = all(result["success"] for result in edit_results)
         return {

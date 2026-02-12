@@ -21,6 +21,7 @@ load_dotenv()
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from core.notify.telegram import send_bilingual_notification, edit_bilingual_notification
+from core.notify.telegraph import _strip_changelog_section
 from core.translate import translate_changelog
 from core.utils import clean_release_body
 
@@ -507,9 +508,9 @@ def main():
             print("（暂无更新说明）")
         print("-" * 50)
 
-        # 翻译更新内容
-        original_content = latest_content or "（暂无更新说明）"
-        translated = translate_changelog(latest_content) if latest_content else ""
+        # 去掉 Changelog 详细列表后再翻译
+        original_content = _strip_changelog_section(latest_content) if latest_content else "（暂无更新说明）"
+        translated = translate_changelog(original_content) if latest_content else ""
 
         # 发送 Telegram 通知
         notify_result = send_bilingual_notification(
@@ -576,9 +577,9 @@ def main():
                 print("-" * 50)
                 print("检测到 Release Notes 已更新，正在编辑之前发送的通知...")
 
-                # 翻译新内容
-                original_content = latest_content or "（暂无更新说明）"
-                translated = translate_changelog(latest_content) if latest_content else ""
+                # 去掉 Changelog 详细列表后再翻译
+                original_content = _strip_changelog_section(latest_content) if latest_content else "（暂无更新说明）"
+                translated = translate_changelog(original_content) if latest_content else ""
 
                 # 编辑之前发送的消息
                 edit_result = edit_bilingual_notification(
@@ -626,11 +627,11 @@ def main():
             return 1
         print("版本信息已更新")
 
-        # 翻译更新内容
-        original_content = latest_content or "（暂无更新说明）"
-        translated = translate_changelog(latest_content) if latest_content else ""
+        # 去掉 Changelog 详细列表后再翻译
+        original_content = _strip_changelog_section(latest_content) if latest_content else "（暂无更新说明）"
+        translated = translate_changelog(original_content) if latest_content else ""
 
-        # 调试：将内容写入本地文件
+        # 调试：将完整内容（含 Changelog）写入本地文件
         debug_output = os.path.join(PROJECT_ROOT, "output", "codex_debug_content.txt")
         try:
             with open(debug_output, 'w', encoding='utf-8') as f:
@@ -638,7 +639,10 @@ def main():
                 f.write(f"Title: {latest_title}\n")
                 f.write(f"链接: {release_link}\n")
                 f.write("=" * 50 + "\n")
-                f.write("原文:\n")
+                f.write("原文（完整）:\n")
+                f.write((latest_content or "") + "\n")
+                f.write("=" * 50 + "\n")
+                f.write("原文（去掉 Changelog）:\n")
                 f.write(original_content + "\n")
                 f.write("=" * 50 + "\n")
                 f.write("翻译:\n")

@@ -132,79 +132,68 @@ def translate_changelog(
     return ""
 
 
-def generate_highlights(
+def summarize_changelog(
     content: str,
     model: str = None,
     api_key: str = None
 ) -> str:
     """
-    生成更新亮点摘要（中文）
+    生成简短的中英文更新要点总结，用于 Telegram 消息正文。
 
     Args:
-        content: 更新日志内容（英文或中文均可）
-        model: 模型名称，默认使用环境变量 LLM_MODEL 或 openrouter/google/gemini-2.5-flash
+        content: 英文更新内容
+        model: 模型名称，默认使用环境变量 LLM_MODEL
         api_key: API Key，默认使用环境变量 LLM_API_KEY
 
     Returns:
-        str: 更新亮点摘要（中文），失败时返回空字符串
+        str: 英文要点 + 空行 + 中文要点，失败时返回空字符串
     """
     model = model or os.getenv("LLM_MODEL", "openrouter/google/gemini-2.5-flash")
     api_key = api_key or os.getenv("LLM_API_KEY", "")
 
     if not api_key:
-        print("LLM 配置未设置，跳过亮点生成")
+        print("翻译配置未设置，跳过总结生成")
         return ""
 
-    prompt = f"""请从以下软件更新日志中提取 2-4 个最重要的更新亮点。
+    prompt = f"""Please extract the 3-8 most important updates from the following release notes and produce a concise bilingual summary.
 
-要求：
-- 每个亮点以 • 开头，一句话概括
-- 总字数控制在 150 字以内
-- 只输出中文
-- 优先选择用户最关心的功能更新、重大改进或重要修复
-- 不要输出标题或其他额外内容，直接输出亮点列表
+Requirements:
+- Output format: English bullet points first, then a blank line, then Chinese bullet points
+- Each bullet point starts with "• "
+- Add a bold header "*Key Updates:*" before English points and "*更新要点：*" before Chinese points
+- Keep the total output under 2000 characters
+- Focus on user-facing changes: new features, important bug fixes, breaking changes
+- Skip minor internal changes, dependency bumps, and trivial fixes
+- Keep each point to one line, concise and clear
 
-术语保留规则（必须保留英文原文）：
-- 通用术语：API, SDK, CLI, Token, OAuth, WebSocket, Streaming, LLM, Prompt
-- 功能名称：Agent, Subagent, Sub-agent, Skill, Hook, Plugin, Plan Mode, Compact Mode, Background Task, Memory, TUI, Sandbox, Transcript Mode
-- 斜杠命令：/compact, /context, /permissions, /mcp, /model, /resume, /export, /stats, /init, /prompts, /approvals
-- 工具与概念：MCP, Model Context Protocol, Tool Use, Tool Call, Bash Tool, Permission, Thinking Block, Frontmatter, exec_command, apply_patch, prompt cache, reasoning effort
-- 配置文件：settings.json, CLAUDE.md, config.toml, AGENTS.md, .mcp.json
+Example output format:
+*Key Updates:*
+• Added new feature X for better performance
+• Fixed critical bug in Y component
+• Breaking change: Z API now requires authentication
 
-待提取内容：
+*更新要点：*
+• 新增 X 功能以提升性能
+• 修复 Y 组件中的关键错误
+• 破坏性变更：Z API 现在需要认证
+
+Release notes:
 {content}"""
 
-    # 亮点是辅助功能，只重试 1 次
-    max_retries = 1
+    try:
+        response = completion(
+            model=model,
+            api_key=api_key,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,
+        )
+        if not response.choices or len(response.choices) == 0:
+            print("总结生成失败: API 返回空结果")
+            return ""
 
-    for attempt in range(max_retries + 1):
-        try:
-            response = completion(
-                model=model,
-                api_key=api_key,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.3,
-            )
-            if not response.choices or len(response.choices) == 0:
-                print("亮点生成失败: API 返回空结果")
-                continue
-
-            highlights = response.choices[0].message.content.strip()
-
-            # 检查返回内容是否包含中文
-            chinese_count = _count_chinese_chars(highlights)
-            if chinese_count >= 5:  # 至少包含 5 个中文字符
-                print(f"亮点生成完成 (中文字符数: {chinese_count})")
-                return highlights
-            else:
-                print(f"亮点生成质量不合格 (中文字符数: {chinese_count}，要求 >= 5)")
-                if attempt < max_retries:
-                    print(f"重试亮点生成 ({attempt + 2}/{max_retries + 1})...")
-
-        except Exception as e:
-            print(f"亮点生成失败: {e}")
-            if attempt < max_retries:
-                print(f"重试亮点生成 ({attempt + 2}/{max_retries + 1})...")
-
-    print("亮点生成失败: 已达到最大重试次数")
-    return ""
+        summary = response.choices[0].message.content.strip()
+        print(f"更新要点总结生成完成 ({len(summary)} 字符)")
+        return summary
+    except Exception as e:
+        print(f"总结生成失败: {e}")
+        return ""

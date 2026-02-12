@@ -154,14 +154,16 @@ def create_page(
             return {
                 "success": True,
                 "url": page["url"],
-                "path": page["path"]
+                "path": page["path"],
+                "error": None
             }
         else:
-            print(f"Telegraph 文章发布失败: {result.get('error')}")
-            return {"success": False, "url": None, "path": None}
+            error = result.get("error", "UNKNOWN_ERROR")
+            print(f"Telegraph 文章发布失败: {error}")
+            return {"success": False, "url": None, "path": None, "error": error}
     except requests.RequestException as e:
         print(f"Telegraph API 请求失败: {e}")
-        return {"success": False, "url": None, "path": None}
+        return {"success": False, "url": None, "path": None, "error": str(e)}
 
 
 def html_to_nodes(html: str) -> list:
@@ -241,6 +243,28 @@ PRODUCT_AUTHORS = {
 }
 
 
+def _strip_changelog_section(text: str) -> str:
+    """
+    移除 Markdown 文本中的 Changelog 详细提交列表部分
+
+    匹配以 "Changelog" 开头的标题（可带 ** 加粗或 # 标记）及其后续内容并移除。
+
+    Args:
+        text: Markdown 格式文本
+
+    Returns:
+        str: 截断后的文本
+    """
+    # 匹配 Changelog / **Changelog** / ## Changelog 等标题及其后续所有内容
+    truncated = re.sub(
+        r'(?m)^(?:\*{0,2}#{0,4}\s*Changelog\s*\*{0,2})\s*\n.*',
+        '',
+        text,
+        flags=re.DOTALL | re.IGNORECASE
+    )
+    return truncated.rstrip()
+
+
 def publish_changelog(
     title: str,
     original: str,
@@ -249,6 +273,8 @@ def publish_changelog(
 ) -> dict:
     """
     发布双语更新日志到 Telegraph
+
+    如果内容过大（CONTENT_TOO_BIG），会自动截掉 Changelog 详细提交列表后重试。
 
     Args:
         title: 产品名称 (如 "Claude Code")
@@ -267,17 +293,24 @@ def publish_changelog(
     author_name = author_info.get("name")
     author_url = author_info.get("url")
 
-    # 构建内容
-    content_parts = []
+    def _build_html(orig: str, trans: str = None) -> str:
+        parts = [markdown_to_html(orig)]
+        if trans:
+            parts.append("<hr>")
+            parts.append(markdown_to_html(trans))
+        return "\n".join(parts)
 
-    # 英文部分
-    content_parts.append(markdown_to_html(original))
+    # 第一次尝试：完整内容
+    content_html = _build_html(original, translated)
+    result = create_page(page_title, content_html, author_name=author_name, author_url=author_url)
 
-    # 中文部分（如果有）
-    if translated:
-        content_parts.append("<hr>")
-        content_parts.append(markdown_to_html(translated))
+    if result["success"] or result.get("error") != "CONTENT_TOO_BIG":
+        return result
 
-    content_html = "\n".join(content_parts)
+    # 第二次尝试：截掉 Changelog 部分后重试
+    trimmed_original = _strip_changelog_section(original)
+    trimmed_translated = _strip_changelog_section(translated) if translated else None
+    print("内容过大，截掉 Changelog 详细列表后重试 Telegraph 发布...")
 
+    content_html = _build_html(trimmed_original, trimmed_translated)
     return create_page(page_title, content_html, author_name=author_name, author_url=author_url)
