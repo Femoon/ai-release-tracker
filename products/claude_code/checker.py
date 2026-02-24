@@ -74,6 +74,36 @@ def parse_latest_version(changelog_text):
     return version, content
 
 
+def parse_specific_version(changelog_text, target_version):
+    """解析指定版本号的更新内容"""
+    version_pattern = r'^## (\d+\.\d+\.\d+)'
+    lines = changelog_text.split('\n')
+
+    content_lines = []
+    found_target = False
+
+    for line in lines:
+        match = re.match(version_pattern, line)
+        if match:
+            if found_target:
+                # 遇到下一个版本，停止收集
+                break
+            if match.group(1) == target_version:
+                found_target = True
+                content_lines.append(line)
+        elif found_target:
+            content_lines.append(line)
+
+    if not found_target:
+        return None
+
+    # 清理尾部空行
+    while content_lines and not content_lines[-1].strip():
+        content_lines.pop()
+
+    return '\n'.join(content_lines)
+
+
 def read_saved_version():
     """读取本地保存的版本号"""
     if not os.path.exists(VERSION_FILE):
@@ -102,8 +132,14 @@ def save_version(version):
 def main():
     parser = argparse.ArgumentParser(description="Claude Code 版本更新检查脚本")
     parser.add_argument("-f", "--force", action="store_true",
-                       help="强制推送最新版本（跳过版本比对，不更新记录）")
+                       help="强制推送版本（跳过版本比对，不更新记录）")
+    parser.add_argument("-v", "--version", type=str, default=None,
+                       help="指定推送的版本号（需配合 --force 使用，如 --force -v 2.1.49）")
     args = parser.parse_args()
+
+    if args.version and not args.force:
+        print("错误: --version 需配合 --force 使用")
+        return 1
 
     print("正在检查 Claude Code 更新...")
     print("-" * 50)
@@ -123,21 +159,32 @@ def main():
 
     # 强制模式：直接推送，不比对，不更新记录
     if args.force:
+        # 确定推送的版本和内容
+        if args.version:
+            push_version = args.version
+            push_content = parse_specific_version(changelog, push_version)
+            if push_content is None:
+                print(f"错误: 未在 CHANGELOG 中找到版本 {push_version}")
+                return 1
+        else:
+            push_version = latest_version
+            push_content = latest_content
+
         print("-" * 50)
-        print("强制模式：直接推送最新版本")
+        print(f"强制模式：直接推送版本 {push_version}")
         print("-" * 50)
         print("更新内容：")
         try:
-            print(latest_content)
+            print(push_content)
         except UnicodeEncodeError:
             print("(内容包含特殊字符，已跳过终端显示)")
         print("-" * 50)
 
         # 发送 Telegram 通知
-        translated = translate_changelog(latest_content)
+        translated = translate_changelog(push_content)
         notify_result = send_bilingual_notification(
-            version=latest_version,
-            original=latest_content,
+            version=push_version,
+            original=push_content,
             translated=translated,
             title="Claude Code",
             bot_token=TELEGRAM_BOT_TOKEN,
@@ -148,7 +195,7 @@ def main():
             print("⚠️  Telegram 通知发送失败")
             return 1
 
-        print("✓ 推送完成（强制模式，未更新本地记录）")
+        print(f"✓ 版本 {push_version} 推送完成（强制模式，未更新本地记录）")
         return 0
 
     # 读取本地保存的版本
