@@ -15,7 +15,7 @@ uv run python main.py
 # 单独检查 Claude Code 版本更新
 uv run python products/claude_code/checker.py
 uv run python products/claude_code/checker.py --force              # 强制推送最新版本（测试用，不更新记录）
-uv run python products/claude_code/checker.py --force -v 2.1.49   # 强制推送指定版本（测试用）
+uv run python products/claude_code/checker.py --force -V 2.1.49   # 强制推送指定版本（测试用）
 
 # 单独检查 OpenAI Codex 版本更新（排除 alpha 版本）
 uv run python products/codex/checker.py

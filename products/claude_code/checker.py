@@ -6,6 +6,8 @@ Claude Code 版本更新检查脚本
 """
 
 import argparse
+import hashlib
+import json
 import os
 import re
 import sys
@@ -17,7 +19,7 @@ load_dotenv()
 
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from core.notify.telegram import send_bilingual_notification
+from core.notify.telegram import edit_bilingual_notification, send_bilingual_notification
 from core.translate import translate_changelog
 
 # 配置
@@ -25,6 +27,7 @@ CHANGELOG_URL = "https://raw.githubusercontent.com/anthropics/claude-code/refs/h
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
 VERSION_FILE = os.path.join(PROJECT_ROOT, "output", "claude_code_latest_version.txt")
+MESSAGE_STATE_FILE = os.path.join(PROJECT_ROOT, "output", "claude_code_message_state.json")
 
 # Telegram 配置（独立环境变量）
 TELEGRAM_BOT_TOKEN = os.getenv("CLAUDE_CODE_BOT_TOKEN", "")
@@ -42,66 +45,52 @@ def fetch_changelog():
         return None
 
 
-def parse_latest_version(changelog_text):
-    """解析最新版本号和更新内容"""
-    # 匹配版本号格式: ## X.Y.Z
-    version_pattern = r'^## (\d+\.\d+\.\d+)'
+def _parse_version_content(changelog_text, target_version=None):
+    """
+    解析 CHANGELOG 中指定版本的内容
 
+    Args:
+        changelog_text: CHANGELOG 全文
+        target_version: 目标版本号，None 时解析最新版本
+
+    Returns:
+        (version, content) 元组；未找到时返回 (None, None)
+    """
+    version_pattern = r'^## (\d+\.\d+\.\d+)'
     lines = changelog_text.split('\n')
-    version = None
+    found_version = None
     content_lines = []
-    found_first_version = False
 
     for line in lines:
         match = re.match(version_pattern, line)
         if match:
-            if not found_first_version:
-                # 找到第一个版本（最新版本）
-                version = match.group(1)
-                found_first_version = True
-                content_lines.append(line)
-            else:
-                # 遇到第二个版本，停止收集
+            if found_version is not None:
                 break
-        elif found_first_version:
+            current = match.group(1)
+            if target_version is None or current == target_version:
+                found_version = current
+                content_lines.append(line)
+        elif found_version is not None:
             content_lines.append(line)
 
-    # 清理尾部空行
+    if found_version is None:
+        return None, None
+
     while content_lines and not content_lines[-1].strip():
         content_lines.pop()
 
-    content = '\n'.join(content_lines)
-    return version, content
+    return found_version, '\n'.join(content_lines)
+
+
+def parse_latest_version(changelog_text):
+    """解析最新版本号和更新内容"""
+    return _parse_version_content(changelog_text)
 
 
 def parse_specific_version(changelog_text, target_version):
     """解析指定版本号的更新内容"""
-    version_pattern = r'^## (\d+\.\d+\.\d+)'
-    lines = changelog_text.split('\n')
-
-    content_lines = []
-    found_target = False
-
-    for line in lines:
-        match = re.match(version_pattern, line)
-        if match:
-            if found_target:
-                # 遇到下一个版本，停止收集
-                break
-            if match.group(1) == target_version:
-                found_target = True
-                content_lines.append(line)
-        elif found_target:
-            content_lines.append(line)
-
-    if not found_target:
-        return None
-
-    # 清理尾部空行
-    while content_lines and not content_lines[-1].strip():
-        content_lines.pop()
-
-    return '\n'.join(content_lines)
+    _, content = _parse_version_content(changelog_text, target_version)
+    return content
 
 
 def read_saved_version():
@@ -129,16 +118,83 @@ def save_version(version):
         return False
 
 
+def compute_body_hash(body):
+    """计算 body 内容的 hash 值"""
+    if not body:
+        return ""
+    return hashlib.md5(body.encode('utf-8')).hexdigest()
+
+
+def read_message_state():
+    """
+    读取消息状态文件
+
+    Returns:
+        dict: {"version": str, "message_ids": list, "body_hash": str} 或 None
+    """
+    if not os.path.exists(MESSAGE_STATE_FILE):
+        return None
+
+    try:
+        with open(MESSAGE_STATE_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"读取消息状态文件失败: {e}")
+        return None
+
+
+def save_message_state(version, message_ids, body_hash):
+    """
+    保存消息状态到文件
+
+    Args:
+        version: 版本号
+        message_ids: Telegram 消息 ID 列表
+        body_hash: body 内容的 hash 值
+    """
+    try:
+        os.makedirs(os.path.dirname(MESSAGE_STATE_FILE), exist_ok=True)
+        state = {
+            "version": version,
+            "message_ids": message_ids,
+            "body_hash": body_hash
+        }
+        with open(MESSAGE_STATE_FILE, 'w', encoding='utf-8') as f:
+            json.dump(state, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        print(f"保存消息状态失败: {e}")
+        return False
+
+
+def clear_message_state():
+    """
+    清理消息状态文件（用于消息已删除等无法恢复的情况）
+    """
+    try:
+        if os.path.exists(MESSAGE_STATE_FILE):
+            os.remove(MESSAGE_STATE_FILE)
+            print("消息状态已清理")
+        return True
+    except Exception as e:
+        print(f"清理消息状态失败: {e}")
+        return False
+
+
 def main():
     parser = argparse.ArgumentParser(description="Claude Code 版本更新检查脚本")
     parser.add_argument("-f", "--force", action="store_true",
                        help="强制推送版本（跳过版本比对，不更新记录）")
-    parser.add_argument("-v", "--version", type=str, default=None,
-                       help="指定推送的版本号（需配合 --force 使用，如 --force -v 2.1.49）")
+    parser.add_argument("-V", "--target-version", type=str, default=None,
+                       help="指定推送的版本号（需配合 --force 使用，如 --force -V 2.1.49）")
     args = parser.parse_args()
 
-    if args.version and not args.force:
-        print("错误: --version 需配合 --force 使用")
+    if args.target_version is not None and not args.force:
+        print("错误: --target-version 需配合 --force 使用")
+        return 1
+
+    if args.target_version is not None and not re.fullmatch(r'\d+\.\d+\.\d+', args.target_version):
+        print(f"错误: 版本号格式不正确 '{args.target_version}'，期望格式如 2.1.49")
         return 1
 
     print("正在检查 Claude Code 更新...")
@@ -160,8 +216,8 @@ def main():
     # 强制模式：直接推送，不比对，不更新记录
     if args.force:
         # 确定推送的版本和内容
-        if args.version:
-            push_version = args.version
+        if args.target_version is not None:
+            push_version = args.target_version
             push_content = parse_specific_version(changelog, push_version)
             if push_content is None:
                 print(f"错误: 未在 CHANGELOG 中找到版本 {push_version}")
@@ -207,8 +263,43 @@ def main():
         save_version(latest_version)
         return 0
     elif saved_version == latest_version:
-        # 版本相同
+        # 版本相同，检查内容是否有更新
+        print("-" * 50)
         print(f"当前已是最新版本 ({latest_version})")
+
+        # 检查 body 是否有变化（用于处理开发者延迟修改 CHANGELOG 的情况）
+        current_body_hash = compute_body_hash(latest_content)
+        message_state = read_message_state()
+
+        if message_state and message_state.get("version") == latest_version:
+            saved_body_hash = message_state.get("body_hash", "")
+            saved_message_ids = message_state.get("message_ids", [])
+
+            if saved_body_hash != current_body_hash and saved_message_ids:
+                print("-" * 50)
+                print("检测到 CHANGELOG 已更新，正在编辑之前发送的通知...")
+
+                translated = translate_changelog(latest_content)
+
+                edit_result = edit_bilingual_notification(
+                    message_ids=saved_message_ids,
+                    version=latest_version,
+                    original=latest_content,
+                    translated=translated,
+                    title="Claude Code",
+                    bot_token=TELEGRAM_BOT_TOKEN,
+                    chat_id=TELEGRAM_CHAT_ID
+                )
+
+                if edit_result["success"]:
+                    print("消息编辑成功")
+                    if not save_message_state(latest_version, edit_result["message_ids"], current_body_hash):
+                        print("⚠️ 消息状态保存失败（不影响主流程）")
+                else:
+                    print("⚠️  消息编辑失败，可能消息已被删除")
+                    clear_message_state()
+                    return 1
+
         return 0
     else:
         # 有新版本
@@ -240,6 +331,14 @@ def main():
         if not notify_result["success"]:
             print("⚠️  Telegram 通知发送失败")
             return 1
+
+        # 保存消息状态（用于后续内容更新时编辑消息）
+        if notify_result["message_ids"]:
+            body_hash = compute_body_hash(latest_content)
+            if not save_message_state(latest_version, notify_result["message_ids"], body_hash):
+                print("⚠️ 消息状态保存失败（不影响主流程）")
+            else:
+                print(f"消息状态已保存 (message_ids: {notify_result['message_ids']})")
 
         return 0
 
