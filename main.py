@@ -20,6 +20,10 @@ CHECKERS = [
         "name": "OpenAI Codex",
         "script": os.path.join(SCRIPT_DIR, "products", "codex", "checker.py"),
     },
+    {
+        "name": "OpenClaw",
+        "script": os.path.join(SCRIPT_DIR, "products", "openclaw", "checker.py"),
+    },
 ]
 
 

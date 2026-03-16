@@ -324,10 +324,17 @@ def send_bilingual_notification(
             return {"success": False, "message_ids": [], "telegraph_url": None}
 
         telegraph_url = telegraph_result["url"]
+        cn_url = telegraph_result.get("cn_url")
 
         # TG 消息：AI 生成简短总结 + Telegraph 链接
         summary = summarize_changelog(original)
-        link_line = f"\n\n[View Full Changelog | 查看完整更新日志]({telegraph_url})"
+
+        if cn_url:
+            link_line = (
+                f"\n\n[View Full Changelog]({telegraph_url}) | [查看完整更新日志]({cn_url})"
+            )
+        else:
+            link_line = f"\n\n[View Full Changelog | 查看完整更新日志]({telegraph_url})"
 
         if summary:
             message = f"{msgs['en_title']}\n\n{summary}{link_line}"
@@ -405,10 +412,17 @@ def edit_bilingual_notification(
             return {"success": False, "message_ids": []}
 
         telegraph_url = telegraph_result["url"]
+        cn_url = telegraph_result.get("cn_url")
 
         # AI 生成简短总结
         summary = summarize_changelog(original)
-        link_line = f"\n\n[View Full Changelog | 查看完整更新日志]({telegraph_url})"
+
+        if cn_url:
+            link_line = (
+                f"\n\n[View Full Changelog]({telegraph_url}) | [查看完整更新日志]({cn_url})"
+            )
+        else:
+            link_line = f"\n\n[View Full Changelog | 查看完整更新日志]({telegraph_url})"
 
         if summary:
             short_message = f"{msgs['en_title']}\n\n{summary}{link_line}"

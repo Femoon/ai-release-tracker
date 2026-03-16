@@ -31,6 +31,19 @@ uv run python products/codex/pusher.py
 
 # 获取 OpenAI Codex 所有 releases 信息
 uv run python products/codex/fetcher.py
+
+# 单独检查 OpenClaw 版本更新（排除 beta 版本）
+uv run python products/openclaw/checker.py
+uv run python products/openclaw/checker.py --force              # 强制推送最新版本（测试用，不更新记录）
+uv run python products/openclaw/checker.py --force -V 2026.3.12 # 强制推送指定版本（测试用）
+
+# 批量推送 OpenClaw 历史版本到 Telegram
+uv run python products/openclaw/pusher.py
+uv run python products/openclaw/pusher.py --count 5  # 推送 5 个
+uv run python products/openclaw/pusher.py --all       # 推送所有未推送版本
+
+# 获取 OpenClaw 所有版本信息
+uv run python products/openclaw/fetcher.py
 ```
 
 ## 依赖
@@ -65,6 +78,7 @@ uv sync
 |------|--------|--------------|
 | products/claude_code/checker.py | GitHub CHANGELOG.md | output/claude_code_latest_version.txt |
 | products/codex/checker.py | GitHub releases Atom feed | output/codex_latest_version.txt |
+| products/openclaw/checker.py | GitHub CHANGELOG.md | output/openclaw_latest_version.txt |
 
 历史推送脚本 `products/claude_code/pusher.py` 会记录已推送版本到 `output/claude_code_pushed_versions.txt`，避免重复推送。
 
@@ -73,7 +87,7 @@ uv sync
 项目配置了自动版本检查（`.github/workflows/version-check.yml`）：
 - 每 30 分钟自动运行
 - 检测到新版本时自动提交版本记录更新
-- 需配置 Repository Secrets: `CLAUDE_CODE_BOT_TOKEN`, `CLAUDE_CODE_CHAT_ID`, `CODEX_BOT_TOKEN`, `CODEX_CHAT_ID`, `LLM_API_KEY`
+- 需配置 Repository Secrets: `CLAUDE_CODE_BOT_TOKEN`, `CLAUDE_CODE_CHAT_ID`, `CODEX_BOT_TOKEN`, `CODEX_CHAT_ID`, `OPENCLAW_BOT_TOKEN`, `OPENCLAW_CHAT_ID`, `LLM_API_KEY`
 
 ## Telegram 通知配置
 
@@ -87,6 +101,10 @@ export CLAUDE_CODE_CHAT_ID="your_claude_code_chat_id"
 # OpenAI Codex 通知配置
 export CODEX_BOT_TOKEN="your_codex_bot_token"
 export CODEX_CHAT_ID="your_codex_chat_id"
+
+# OpenClaw 通知配置
+export OPENCLAW_BOT_TOKEN="your_openclaw_bot_token"
+export OPENCLAW_CHAT_ID="your_openclaw_chat_id"
 ```
 
 未配置时脚本正常运行，仅跳过通知功能。
@@ -171,6 +189,10 @@ CLAUDE_CODE_CHAT_ID=your_claude_code_chat_id
 # OpenAI Codex 通知配置
 CODEX_BOT_TOKEN=your_codex_bot_token
 CODEX_CHAT_ID=your_codex_chat_id
+
+# OpenClaw 通知配置
+OPENCLAW_BOT_TOKEN=your_openclaw_bot_token
+OPENCLAW_CHAT_ID=your_openclaw_chat_id
 
 # AI 翻译配置
 LLM_API_KEY=your_llm_api_key

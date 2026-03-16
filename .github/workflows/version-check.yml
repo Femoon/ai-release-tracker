@@ -47,6 +47,9 @@ jobs:
           # OpenAI Codex 通知配置
           CODEX_BOT_TOKEN: ${{ secrets.CODEX_BOT_TOKEN }}
           CODEX_CHAT_ID: ${{ secrets.CODEX_CHAT_ID }}
+          # OpenClaw 通知配置
+          OPENCLAW_BOT_TOKEN: ${{ secrets.OPENCLAW_BOT_TOKEN }}
+          OPENCLAW_CHAT_ID: ${{ secrets.OPENCLAW_CHAT_ID }}
           # AI 翻译配置
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_MODEL: ${{ vars.LLM_MODEL }}

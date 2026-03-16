@@ -239,6 +239,10 @@ PRODUCT_AUTHORS = {
     "Codex": {
         "name": "Codex Changelog",
         "url": "https://t.me/codex_push"
+    },
+    "OpenClaw": {
+        "name": "OpenClaw Changelog",
+        "url": "https://t.me/openclaw_push"
     }
 }
 
@@ -263,6 +267,28 @@ def _strip_changelog_section(text: str) -> str:
         flags=re.DOTALL | re.IGNORECASE
     )
     return truncated.rstrip()
+
+
+def _strip_fixes_section(text: str) -> str:
+    """
+    移除 Markdown 文本中的 Fixes 部分，只保留 Changes/Breaking 等
+
+    Args:
+        text: Markdown 格式文本
+
+    Returns:
+        str: 截断后的文本，末尾附加省略提示
+    """
+    truncated = re.sub(
+        r'(?m)^(?:\*{0,2}#{1,4}\s*Fixes\s*\*{0,2})\s*\n.*',
+        '',
+        text,
+        flags=re.DOTALL | re.IGNORECASE
+    )
+    truncated = truncated.rstrip()
+    if truncated != text.rstrip():
+        truncated += "\n\n*(Fixes section omitted due to length limit)*"
+    return truncated
 
 
 def publish_changelog(
@@ -313,4 +339,45 @@ def publish_changelog(
     print("内容过大，截掉 Changelog 详细列表后重试 Telegraph 发布...")
 
     content_html = _build_html(trimmed_original, trimmed_translated)
-    return create_page(page_title, content_html, author_name=author_name, author_url=author_url)
+    result = create_page(page_title, content_html, author_name=author_name, author_url=author_url)
+
+    if result["success"] or result.get("error") != "CONTENT_TOO_BIG":
+        return result
+
+    # 第三次尝试：英文和中文分开发布两篇文章
+    print("内容仍然过大，拆分为英文和中文两篇 Telegraph 文章...")
+
+    en_html = _build_html(trimmed_original)
+    en_result = create_page(f"{page_title} (EN)", en_html, author_name=author_name, author_url=author_url)
+
+    # 单篇英文仍然过大，截掉 Fixes 部分后重试
+    if not en_result["success"] and en_result.get("error") == "CONTENT_TOO_BIG":
+        print("单篇英文仍然过大，截掉 Fixes 部分后重试...")
+        trimmed_original = _strip_fixes_section(trimmed_original)
+        trimmed_translated = _strip_fixes_section(trimmed_translated) if trimmed_translated else None
+        en_html = _build_html(trimmed_original)
+        en_result = create_page(f"{page_title} (EN)", en_html, author_name=author_name, author_url=author_url)
+
+    if not en_result["success"]:
+        return en_result
+
+    cn_url = None
+    if trimmed_translated:
+        cn_html = _build_html(trimmed_translated)
+        cn_result = create_page(f"{page_title} (CN)", cn_html, author_name=author_name, author_url=author_url)
+        # 中文也可能过大，截掉 Fixes 后重试
+        if not cn_result["success"] and cn_result.get("error") == "CONTENT_TOO_BIG":
+            print("单篇中文仍然过大，截掉 Fixes 部分后重试...")
+            trimmed_translated = _strip_fixes_section(trimmed_translated)
+            cn_html = _build_html(trimmed_translated)
+            cn_result = create_page(f"{page_title} (CN)", cn_html, author_name=author_name, author_url=author_url)
+        if cn_result["success"]:
+            cn_url = cn_result["url"]
+
+    return {
+        "success": True,
+        "url": en_result["url"],
+        "path": en_result["path"],
+        "cn_url": cn_url,
+        "error": None
+    }
