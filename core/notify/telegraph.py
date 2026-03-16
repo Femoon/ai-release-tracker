@@ -354,7 +354,6 @@ def publish_changelog(
     if not en_result["success"] and en_result.get("error") == "CONTENT_TOO_BIG":
         print("单篇英文仍然过大，截掉 Fixes 部分后重试...")
         trimmed_original = _strip_fixes_section(trimmed_original)
-        trimmed_translated = _strip_fixes_section(trimmed_translated) if trimmed_translated else None
         en_html = _build_html(trimmed_original)
         en_result = create_page(f"{page_title} (EN)", en_html, author_name=author_name, author_url=author_url)
 
