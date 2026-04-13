@@ -37,8 +37,8 @@ PUSH_DELAY = 3
 # 推送失败重试次数
 MAX_RETRY = 3
 
-# 版本号正则：日期格式 YYYY.M.D（如 2026.3.12）
-VERSION_PATTERN = r'^## (\d{4}\.\d{1,2}\.\d{1,2})'
+# 版本号正则：日期格式 YYYY.M.D 或 YYYY.M.D-N（如 2026.3.12 或 2026.4.7-1）
+VERSION_PATTERN = r'^## (\d{4}\.\d{1,2}\.\d{1,2}(?:-\d+)?)'
 
 
 def fetch_changelog():

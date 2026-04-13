@@ -22,8 +22,8 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
 OUTPUT_FILE = os.path.join(PROJECT_ROOT, "output", "openclaw_releases.txt")
 
-# 版本号正则：日期格式 YYYY.M.D（如 2026.3.12）
-VERSION_PATTERN = r'^## (\d{4}\.\d{1,2}\.\d{1,2})'
+# 版本号正则：日期格式 YYYY.M.D 或 YYYY.M.D-N（如 2026.3.12 或 2026.4.7-1）
+VERSION_PATTERN = r'^## (\d{4}\.\d{1,2}\.\d{1,2}(?:-\d+)?)'
 
 
 def fetch_changelog():

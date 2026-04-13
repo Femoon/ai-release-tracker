@@ -33,8 +33,8 @@ MESSAGE_STATE_FILE = os.path.join(PROJECT_ROOT, "output", "openclaw_message_stat
 TELEGRAM_BOT_TOKEN = os.getenv("OPENCLAW_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("OPENCLAW_CHAT_ID", "")
 
-# 版本号正则：日期格式 YYYY.M.D（如 2026.3.12）
-VERSION_PATTERN = r'^## (\d{4}\.\d{1,2}\.\d{1,2})'
+# 版本号正则：日期格式 YYYY.M.D 或 YYYY.M.D-N（如 2026.3.12 或 2026.4.7-1）
+VERSION_PATTERN = r'^## (\d{4}\.\d{1,2}\.\d{1,2}(?:-\d+)?)'
 
 
 def fetch_changelog():
@@ -51,6 +51,30 @@ def fetch_changelog():
 def _is_beta_version(version_line):
     """检查版本行是否包含 beta 标记"""
     return "beta" in version_line.lower()
+
+
+def _parse_version_tuple(version_str):
+    """将 'YYYY.M.D' 或 'YYYY.M.D-N' 版本号解析为可比较的元组"""
+    try:
+        if '-' in version_str:
+            base, suffix = version_str.split('-', 1)
+            patch = int(suffix)
+        else:
+            base = version_str
+            patch = 0
+        parts = base.split('.')
+        return (*tuple(int(p) for p in parts), patch)
+    except (ValueError, AttributeError):
+        return None
+
+
+def _is_newer_version(remote, local):
+    """判断远程版本是否严格大于本地版本"""
+    r = _parse_version_tuple(remote)
+    loc = _parse_version_tuple(local)
+    if r is None or loc is None:
+        return True  # 解析失败时不阻断，保持原有行为
+    return r > loc
 
 
 def _parse_version_content(changelog_text, target_version=None):
@@ -203,8 +227,8 @@ def main():
         print("错误: --target-version 需配合 --force 使用")
         return 1
 
-    if args.target_version is not None and not re.fullmatch(r'\d{4}\.\d{1,2}\.\d{1,2}', args.target_version):
-        print(f"错误: 版本号格式不正确 '{args.target_version}'，期望格式如 2026.3.12")
+    if args.target_version is not None and not re.fullmatch(r'\d{4}\.\d{1,2}\.\d{1,2}(?:-\d+)?', args.target_version):
+        print(f"错误: 版本号格式不正确 '{args.target_version}'，期望格式如 2026.3.12 或 2026.4.7-1")
         return 1
 
     print("正在检查 OpenClaw 更新...")
@@ -312,6 +336,11 @@ def main():
 
         return 0
     else:
+        # 版本不同，校验方向
+        if not _is_newer_version(latest_version, saved_version):
+            print(f"远程版本 {latest_version} 不高于本地记录 {saved_version}，跳过")
+            return 0
+
         # 有新版本
         print(f"发现新版本！ {saved_version} -> {latest_version}")
         print("-" * 50)
