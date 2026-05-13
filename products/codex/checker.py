@@ -11,8 +11,6 @@ import re
 import sys
 import xml.etree.ElementTree as ET
 import requests
-import json
-import hashlib
 
 # 加载 .env 文件
 from dotenv import load_dotenv
@@ -24,6 +22,13 @@ from core.notify.telegram import send_bilingual_notification, edit_bilingual_not
 from core.notify.telegraph import _strip_changelog_section
 from core.translate import translate_changelog
 from core.utils import clean_release_body
+from core.state import (
+    compute_body_hash,
+    read_message_state as _read_message_state,
+    save_message_state as _save_message_state,
+    clear_message_state as _clear_message_state,
+    is_edit_locked,
+)
 
 # 配置
 RELEASES_ATOM_URL = "https://github.com/openai/codex/releases.atom"
@@ -313,67 +318,16 @@ def save_version(version):
         return False
 
 
-def compute_body_hash(body):
-    """计算 body 内容的 hash 值"""
-    if not body:
-        return ""
-    return hashlib.md5(body.encode('utf-8')).hexdigest()
-
-
 def read_message_state():
-    """
-    读取消息状态文件
-
-    Returns:
-        dict: {"version": str, "message_ids": list, "body_hash": str} 或 None
-    """
-    if not os.path.exists(MESSAGE_STATE_FILE):
-        return None
-
-    try:
-        with open(MESSAGE_STATE_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except Exception as e:
-        print(f"读取消息状态文件失败: {e}")
-        return None
+    return _read_message_state(MESSAGE_STATE_FILE)
 
 
-def save_message_state(version, message_ids, body_hash):
-    """
-    保存消息状态到文件
-
-    Args:
-        version: 版本号
-        message_ids: Telegram 消息 ID 列表
-        body_hash: body 内容的 hash 值
-    """
-    try:
-        os.makedirs(os.path.dirname(MESSAGE_STATE_FILE), exist_ok=True)
-        state = {
-            "version": version,
-            "message_ids": message_ids,
-            "body_hash": body_hash
-        }
-        with open(MESSAGE_STATE_FILE, 'w', encoding='utf-8') as f:
-            json.dump(state, f, ensure_ascii=False, indent=2)
-        return True
-    except Exception as e:
-        print(f"保存消息状态失败: {e}")
-        return False
+def save_message_state(version, message_ids, body_hash, edit_count=0):
+    return _save_message_state(MESSAGE_STATE_FILE, version, message_ids, body_hash, edit_count)
 
 
 def clear_message_state():
-    """
-    清理消息状态文件（用于消息已删除等无法恢复的情况）
-    """
-    try:
-        if os.path.exists(MESSAGE_STATE_FILE):
-            os.remove(MESSAGE_STATE_FILE)
-            print("消息状态已清理")
-        return True
-    except Exception as e:
-        print(f"清理消息状态失败: {e}")
-        return False
+    return _clear_message_state(MESSAGE_STATE_FILE)
 
 
 def resolve_saved_version_to_tag(saved_version):
@@ -571,9 +525,24 @@ def main():
         if message_state and message_state.get("version") == latest_tag:
             saved_body_hash = message_state.get("body_hash", "")
             saved_message_ids = message_state.get("message_ids", [])
+            saved_edit_count = message_state.get("edit_count", 0)
 
             # 检查 body 是否有变化且之前的 body 是空的
             if saved_body_hash != current_body_hash and saved_message_ids:
+                if is_edit_locked(message_state, latest_tag):
+                    print("-" * 50)
+                    print(
+                        f"检测到 Release Notes 已更新，但版本 {latest_tag} 已达每版本编辑上限，"
+                        "跳过翻译和消息编辑"
+                    )
+                    save_message_state(
+                        latest_tag, saved_message_ids, current_body_hash,
+                        edit_count=saved_edit_count,
+                    )
+                    if was_resolved:
+                        save_version(latest_tag)
+                    return 0
+
                 print("-" * 50)
                 print("检测到 Release Notes 已更新，正在编辑之前发送的通知...")
 
@@ -596,7 +565,10 @@ def main():
                 if edit_result["success"]:
                     print("消息编辑成功")
                     # 更新 body_hash 和可能变化的 message_ids
-                    if not save_message_state(latest_tag, edit_result["message_ids"], current_body_hash):
+                    if not save_message_state(
+                        latest_tag, edit_result["message_ids"], current_body_hash,
+                        edit_count=saved_edit_count + 1,
+                    ):
                         print("⚠️ 消息状态保存失败（不影响主流程）")
                 else:
                     print("⚠️  消息编辑失败，可能消息已被删除")
@@ -667,10 +639,12 @@ def main():
             print("⚠️  Telegram 通知发送失败")
             return 1
 
-        # 保存消息状态（用于后续 body 更新时编辑消息）
+        # 保存消息状态（用于后续 body 更新时编辑消息）；新版本重置 edit_count=0
         if notify_result["message_ids"]:
             body_hash = compute_body_hash(latest_content)
-            if not save_message_state(latest_tag, notify_result["message_ids"], body_hash):
+            if not save_message_state(
+                latest_tag, notify_result["message_ids"], body_hash, edit_count=0,
+            ):
                 print("⚠️ 消息状态保存失败（不影响主流程）")
             else:
                 print(f"消息状态已保存 (message_ids: {notify_result['message_ids']})")

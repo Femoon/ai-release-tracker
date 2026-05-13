@@ -8,11 +8,45 @@ import os
 import re
 from litellm import completion
 
+from core.translate import cache as translation_cache
+
 
 # 翻译质量检查：中文字符最低占比
 MIN_CHINESE_RATIO = 0.05  # 5%
-# 最大重试次数
-MAX_RETRIES = 2
+# 最大重试次数（仅对"内容相关"的失败如质量不达标生效；致命错误立即失败不重试）
+MAX_RETRIES = 1
+
+# 致命错误关键词：命中后立即终止重试，不再继续消耗 API 配额
+# 包含两类：
+# - 额度/配额类（重试也无济于事，且仍会扣费）：max_tokens / credits / 402 / quota / insufficient
+# - 内容/权限类（同样的输入重试只会再次失败）：403 / prohibited / violation / content_policy / blocked
+_FATAL_ERROR_KEYWORDS = (
+    "max_tokens",
+    "credits",
+    "insufficient",
+    "402",
+    "403",
+    "quota",
+    "rate_limit_exceeded",
+    "prohibited",
+    "violation",
+    "content_policy",
+    "blocked",
+)
+
+# 显式给 LiteLLM completion 设置输出上限，避免 OpenRouter 默认 65536 触发
+# "requires more credits / fewer max_tokens" 402 错误
+_TRANSLATE_MAX_TOKENS = 16384
+_SUMMARIZE_MAX_TOKENS = 4096
+# summarize 的输入截断阈值：prompt 要求输出 < 2000 字符摘要，输入超过此阈值
+# 时只保留前面部分（通常包含 Highlights / Breaking / New Features 等高价值段落），
+# 避免把 70k+ 字符的 changelog 整个塞给 LLM 浪费输入 token
+_SUMMARIZE_INPUT_TRUNCATE_CHARS = 24000
+
+
+def _is_fatal_error(err: Exception) -> bool:
+    msg = str(err).lower()
+    return any(kw in msg for kw in _FATAL_ERROR_KEYWORDS)
 
 
 def _count_chinese_chars(text: str) -> int:
@@ -65,6 +99,11 @@ def translate_changelog(
         print("翻译配置未设置，跳过翻译")
         return ""
 
+    cached = translation_cache.get(content, model, kind="translate")
+    if cached:
+        print(f"翻译缓存命中 (跳过 LLM 调用, {len(cached)} 字符)")
+        return cached
+
     prompt = f"""请将以下软件更新日志逐条翻译成中文，直接输出翻译结果。
 
 关键要求（必须严格遵守）：
@@ -103,6 +142,7 @@ def translate_changelog(
                 api_key=api_key,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.3,
+                max_tokens=_TRANSLATE_MAX_TOKENS,
             )
             if not response.choices or len(response.choices) == 0:
                 print("翻译失败: API 返回空结果")
@@ -115,6 +155,7 @@ def translate_changelog(
                 chinese_count = _count_chinese_chars(translated)
                 chinese_ratio = chinese_count / len(translated) * 100
                 print(f"翻译完成 (中文占比: {chinese_ratio:.1f}%)")
+                translation_cache.set(content, model, translated, kind="translate")
                 return translated
             else:
                 chinese_count = _count_chinese_chars(translated)
@@ -125,6 +166,9 @@ def translate_changelog(
 
         except Exception as e:
             print(f"翻译失败: {e}")
+            if _is_fatal_error(e):
+                print("翻译失败: 检测到致命错误（额度/credits/max_tokens），终止重试")
+                return ""
             if attempt < MAX_RETRIES:
                 print(f"重试翻译 ({attempt + 2}/{MAX_RETRIES + 1})...")
 
@@ -155,6 +199,20 @@ def summarize_changelog(
         print("翻译配置未设置，跳过总结生成")
         return ""
 
+    cached = translation_cache.get(content, model, kind="summarize")
+    if cached:
+        print(f"摘要缓存命中 (跳过 LLM 调用, {len(cached)} 字符)")
+        return cached
+
+    # 超长输入截断：摘要只需要前面的 Highlights/Breaking/New Features 段落
+    summarize_input = content
+    if len(summarize_input) > _SUMMARIZE_INPUT_TRUNCATE_CHARS:
+        print(
+            f"摘要输入过长 ({len(summarize_input)} 字符)，截断到前 "
+            f"{_SUMMARIZE_INPUT_TRUNCATE_CHARS} 字符以节省 token"
+        )
+        summarize_input = summarize_input[:_SUMMARIZE_INPUT_TRUNCATE_CHARS]
+
     prompt = f"""Please extract the 3-8 most important updates from the following release notes and produce a concise bilingual summary.
 
 Requirements:
@@ -178,7 +236,7 @@ Example output format:
 • 破坏性变更：Z API 现在需要认证
 
 Release notes:
-{content}"""
+{summarize_input}"""
 
     try:
         response = completion(
@@ -186,6 +244,7 @@ Release notes:
             api_key=api_key,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,
+            max_tokens=_SUMMARIZE_MAX_TOKENS,
         )
         if not response.choices or len(response.choices) == 0:
             print("总结生成失败: API 返回空结果")
@@ -193,7 +252,11 @@ Release notes:
 
         summary = response.choices[0].message.content.strip()
         print(f"更新要点总结生成完成 ({len(summary)} 字符)")
+        # 用原始 content 作为缓存键，避免截断后查不到
+        translation_cache.set(content, model, summary, kind="summarize")
         return summary
     except Exception as e:
         print(f"总结生成失败: {e}")
+        if _is_fatal_error(e):
+            print("总结失败: 检测到致命错误（额度/credits/max_tokens），不再重试")
         return ""
