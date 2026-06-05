@@ -4,6 +4,7 @@
 
 [![][claude-code-shield]][claude-code-link]
 [![][codex-shield]][codex-link]
+[![][openclaw-shield]][openclaw-link]
 
 </div>
 
@@ -16,6 +17,8 @@ A monitoring tool for tracking version updates of AI coding tools. Automatically
 [claude-code-link]: https://t.me/claude_code_push
 [codex-shield]: https://img.shields.io/badge/Telegram-@codex__push-0088CC?logo=telegram
 [codex-link]: https://t.me/codex_push
+[openclaw-shield]: https://img.shields.io/badge/Telegram-@openclaw__push-0088CC?logo=telegram
+[openclaw-link]: https://t.me/openclaw_push
 
 ## Features
 
@@ -32,6 +35,7 @@ A monitoring tool for tracking version updates of AI coding tools. Automatically
 |------|--------|-------------|----------|
 | Claude Code | products/claude_code/checker.py | GitHub CHANGELOG.md | [@claude_code_push](https://t.me/claude_code_push) |
 | OpenAI Codex | products/codex/checker.py | GitHub releases Atom feed | [@codex_push](https://t.me/codex_push) |
+| OpenClaw | products/openclaw/checker.py | GitHub CHANGELOG.md | [@openclaw_push](https://t.me/openclaw_push) |
 
 ## Quick Start
 
@@ -77,6 +81,9 @@ uv run python products/claude_code/checker.py
 # Check OpenAI Codex only (excludes alpha versions)
 uv run python products/codex/checker.py
 
+# Check OpenClaw only (excludes beta versions)
+uv run python products/openclaw/checker.py
+
 # Batch push Claude Code historical versions to Telegram
 uv run python products/claude_code/pusher.py              # Push 3 versions (default)
 uv run python products/claude_code/pusher.py --count 5    # Push 5 versions
@@ -87,6 +94,12 @@ uv run python products/codex/pusher.py
 
 # Fetch all OpenAI Codex releases
 uv run python products/codex/fetcher.py
+
+# Batch push OpenClaw historical versions to Telegram
+uv run python products/openclaw/pusher.py
+
+# Fetch all OpenClaw releases
+uv run python products/openclaw/fetcher.py
 ```
 
 ## Configuration
@@ -99,10 +112,12 @@ CLAUDE_CODE_BOT_TOKEN=your_bot_token
 CLAUDE_CODE_CHAT_ID=your_chat_id
 CODEX_BOT_TOKEN=your_bot_token
 CODEX_CHAT_ID=your_chat_id
+OPENCLAW_BOT_TOKEN=your_bot_token
+OPENCLAW_CHAT_ID=your_chat_id
 
 # AI Translation (optional, English only if not configured)
 LLM_API_KEY=your_llm_api_key
-LLM_MODEL=openrouter/google/gemini-2.5-flash  # optional, specify translation model
+LLM_MODEL=openrouter/deepseek/deepseek-v4-flash  # optional, specify translation model
 ```
 
 Scripts run normally without configuration, just skip the corresponding features.
@@ -113,7 +128,7 @@ The project includes automated version checking (`.github/workflows/version-chec
 
 - Runs every 30 minutes
 - Automatically commits version record updates
-- Required secrets: `CLAUDE_CODE_BOT_TOKEN`, `CLAUDE_CODE_CHAT_ID`, `CODEX_BOT_TOKEN`, `CODEX_CHAT_ID`, `LLM_API_KEY`
+- Required secrets: `CLAUDE_CODE_BOT_TOKEN`, `CLAUDE_CODE_CHAT_ID`, `CODEX_BOT_TOKEN`, `CODEX_CHAT_ID`, `OPENCLAW_BOT_TOKEN`, `OPENCLAW_CHAT_ID`, `LLM_API_KEY`
 
 ## Docker Deployment
 

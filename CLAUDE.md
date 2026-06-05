@@ -93,6 +93,11 @@ uv sync
 
 每个工具使用独立的环境变量，可推送到不同的 bot 和频道：
 
+公开频道：
+- Claude Code: https://t.me/claude_code_push
+- OpenAI Codex: https://t.me/codex_push
+- OpenClaw: https://t.me/openclaw_push
+
 ```bash
 # Claude Code 通知配置
 export CLAUDE_CODE_BOT_TOKEN="your_claude_code_bot_token"
@@ -116,8 +121,8 @@ export OPENCLAW_CHAT_ID="your_openclaw_chat_id"
 ```bash
 export LLM_API_KEY="your_llm_api_key"
 
-# 可选：指定翻译模型，默认 openrouter/google/gemini-2.5-flash
-export LLM_MODEL="openrouter/google/gemini-2.5-flash"
+# 可选：指定翻译模型，默认 openrouter/deepseek/deepseek-v4-flash
+export LLM_MODEL="openrouter/deepseek/deepseek-v4-flash"
 ```
 
 未配置时跳过翻译，仅发送英文原文。
@@ -196,6 +201,7 @@ OPENCLAW_CHAT_ID=your_openclaw_chat_id
 
 # AI 翻译配置
 LLM_API_KEY=your_llm_api_key
+LLM_MODEL=openrouter/deepseek/deepseek-v4-flash
 
 # GitHub API 配置（可选，避免 API 速率限制）
 # 注意：不要使用 GITHUB_TOKEN（GitHub Actions 保留变量）

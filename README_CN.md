@@ -4,6 +4,7 @@
 
 [![][claude-code-shield]][claude-code-link]
 [![][codex-shield]][codex-link]
+[![][openclaw-shield]][openclaw-link]
 
 </div>
 
@@ -16,6 +17,8 @@ AI 编码工具版本更新监控工具。自动检查新版本发布，并发�
 [claude-code-link]: https://t.me/claude_code_push
 [codex-shield]: https://img.shields.io/badge/Telegram-@codex__push-0088CC?logo=telegram
 [codex-link]: https://t.me/codex_push
+[openclaw-shield]: https://img.shields.io/badge/Telegram-@openclaw__push-0088CC?logo=telegram
+[openclaw-link]: https://t.me/openclaw_push
 
 ## 功能特性
 
@@ -32,6 +35,7 @@ AI 编码工具版本更新监控工具。自动检查新版本发布，并发�
 |------|------|--------|----------|
 | Claude Code | products/claude_code/checker.py | GitHub CHANGELOG.md | [@claude_code_push](https://t.me/claude_code_push) |
 | OpenAI Codex | products/codex/checker.py | GitHub releases Atom feed | [@codex_push](https://t.me/codex_push) |
+| OpenClaw | products/openclaw/checker.py | GitHub CHANGELOG.md | [@openclaw_push](https://t.me/openclaw_push) |
 
 ## 快速开始
 
@@ -77,6 +81,9 @@ uv run python products/claude_code/checker.py
 # 单独检查 OpenAI Codex（排除 alpha 版本）
 uv run python products/codex/checker.py
 
+# 单独检查 OpenClaw（排除 beta 版本）
+uv run python products/openclaw/checker.py
+
 # 批量推送 Claude Code 历史版本到 Telegram
 uv run python products/claude_code/pusher.py              # 推送 3 个版本（默认）
 uv run python products/claude_code/pusher.py --count 5    # 推送 5 个版本
@@ -87,6 +94,12 @@ uv run python products/codex/pusher.py
 
 # 获取 OpenAI Codex 所有 releases 信息
 uv run python products/codex/fetcher.py
+
+# 批量推送 OpenClaw 历史版本到 Telegram
+uv run python products/openclaw/pusher.py
+
+# 获取 OpenClaw 所有版本信息
+uv run python products/openclaw/fetcher.py
 ```
 
 ## 配置
@@ -99,10 +112,12 @@ CLAUDE_CODE_BOT_TOKEN=your_bot_token
 CLAUDE_CODE_CHAT_ID=your_chat_id
 CODEX_BOT_TOKEN=your_bot_token
 CODEX_CHAT_ID=your_chat_id
+OPENCLAW_BOT_TOKEN=your_bot_token
+OPENCLAW_CHAT_ID=your_chat_id
 
 # AI 翻译（可选，未配置时仅发送英文）
 LLM_API_KEY=your_llm_api_key
-LLM_MODEL=openrouter/google/gemini-2.5-flash  # 可选，指定翻译模型
+LLM_MODEL=openrouter/deepseek/deepseek-v4-flash  # 可选，指定翻译模型
 ```
 
 未配置时脚本正常运行，仅跳过对应功能。
@@ -113,7 +128,7 @@ LLM_MODEL=openrouter/google/gemini-2.5-flash  # 可选，指定翻译模型
 
 - 每 30 分钟自动运行
 - 检测到新版本时自动提交版本记录更新
-- 需配置 Repository Secrets：`CLAUDE_CODE_BOT_TOKEN`、`CLAUDE_CODE_CHAT_ID`、`CODEX_BOT_TOKEN`、`CODEX_CHAT_ID`、`LLM_API_KEY`
+- 需配置 Repository Secrets：`CLAUDE_CODE_BOT_TOKEN`、`CLAUDE_CODE_CHAT_ID`、`CODEX_BOT_TOKEN`、`CODEX_CHAT_ID`、`OPENCLAW_BOT_TOKEN`、`OPENCLAW_CHAT_ID`、`LLM_API_KEY`
 
 ## Docker 部署
 
