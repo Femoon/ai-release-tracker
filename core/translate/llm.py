@@ -38,10 +38,22 @@ _FATAL_ERROR_KEYWORDS = (
 # "requires more credits / fewer max_tokens" 402 错误
 _TRANSLATE_MAX_TOKENS = 16384
 _SUMMARIZE_MAX_TOKENS = 4096
+_REASONING_EFFORT = "high"
 # summarize 的输入截断阈值：prompt 要求输出 < 2000 字符摘要，输入超过此阈值
 # 时只保留前面部分（通常包含 Highlights / Breaking / New Features 等高价值段落），
 # 避免把 70k+ 字符的 changelog 整个塞给 LLM 浪费输入 token
 _SUMMARIZE_INPUT_TRUNCATE_CHARS = 24000
+
+_TERMINOLOGY_INSTRUCTION = (
+    "专业术语规则（必须遵守）：以下 CLI 术语及其大小写、单复数、连字符变体必须原样保留："
+    "API, SDK, CLI, Token, OAuth, WebSocket, Streaming, LLM, Prompt, Agent, Subagent, "
+    "Sub-agent, multi-agent, Skill, Hook, Plugin, MCP, Model Context Protocol, TUI, Sandbox, "
+    "worktree, prompt cache, context window, reasoning effort, Tool Use, Tool Call, Bash Tool, "
+    "Permission, Thinking Block, Frontmatter, Background Task, Memory, Transcript Mode, "
+    "exec_command, apply_patch, Remote Control, Code Mode, Plan Mode, Compact Mode, Focus view, "
+    "auto mode。Agent 仅在表示 CLI 协作执行单元时保留英文；proxy、user agent 等其他含义"
+    "按语境翻译。不确定的产品功能名保留英文。"
+)
 
 
 def _is_fatal_error(err: Exception) -> bool:
@@ -122,15 +134,10 @@ def translate_changelog(
 格式要求：
 1. 保持 Markdown 格式不变（标题、列表、代码块等）
 2. 版本号、行内代码保持原样
-3. 以下内容保留英文原文：
-   - GitHub 用户名：@xxx 格式保持不变
-   - 通用术语：API, SDK, CLI, Token, OAuth, WebSocket, Streaming, LLM, Prompt
-   - 功能名称：Agent, Subagent, Sub-agent, Skill, Hook, Plugin, Plan Mode, Compact Mode, Background Task, Memory, TUI, Sandbox, Transcript Mode
-   - 斜杠命令：/compact, /context, /permissions, /mcp, /model, /resume, /export, /stats, /init, /prompts, /approvals
-   - 工具与概念：MCP, Model Context Protocol, Tool Use, Tool Call, Bash Tool, Permission, Thinking Block, Frontmatter, exec_command, apply_patch, prompt cache, reasoning effort
-   - 配置文件：settings.json, CLAUDE.md, config.toml, AGENTS.md, .mcp.json
+3. GitHub 用户名、斜杠命令、配置文件名保持原样
 4. 语言流畅自然，符合中文技术文档习惯
-5. 对于不确定的专有名词，保留英文
+
+{_TERMINOLOGY_INSTRUCTION}
 
 待翻译内容：
 {content}"""
@@ -143,6 +150,7 @@ def translate_changelog(
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.3,
                 max_tokens=_TRANSLATE_MAX_TOKENS,
+                reasoning_effort=_REASONING_EFFORT,
             )
             if not response.choices or len(response.choices) == 0:
                 print("翻译失败: API 返回空结果")
@@ -224,6 +232,8 @@ Requirements:
 - Skip minor internal changes, dependency bumps, and trivial fixes
 - Keep each point to one line, concise and clear
 
+{_TERMINOLOGY_INSTRUCTION}
+
 Example output format:
 *Key Updates:*
 • Added new feature X for better performance
@@ -245,6 +255,7 @@ Release notes:
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,
             max_tokens=_SUMMARIZE_MAX_TOKENS,
+            reasoning_effort=_REASONING_EFFORT,
         )
         if not response.choices or len(response.choices) == 0:
             print("总结生成失败: API 返回空结果")
