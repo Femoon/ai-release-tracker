@@ -117,7 +117,7 @@ OPENCLAW_CHAT_ID=your_chat_id
 
 # AI Translation (optional, English only if not configured)
 LLM_API_KEY=your_llm_api_key
-LLM_MODEL=openrouter/deepseek/deepseek-v4-flash  # optional, specify translation model
+LLM_MODEL=openrouter/deepseek/deepseek-v4-flash-0731
 ```
 
 Scripts run normally without configuration, just skip the corresponding features.

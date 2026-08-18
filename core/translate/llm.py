@@ -38,7 +38,6 @@ _FATAL_ERROR_KEYWORDS = (
 # "requires more credits / fewer max_tokens" 402 错误
 _TRANSLATE_MAX_TOKENS = 16384
 _SUMMARIZE_MAX_TOKENS = 4096
-_REASONING_EFFORT = "high"
 # summarize 的输入截断阈值：prompt 要求输出 < 2000 字符摘要，输入超过此阈值
 # 时只保留前面部分（通常包含 Highlights / Breaking / New Features 等高价值段落），
 # 避免把 70k+ 字符的 changelog 整个塞给 LLM 浪费输入 token
@@ -98,14 +97,18 @@ def translate_changelog(
 
     Args:
         content: 要翻译的英文内容
-        model: 模型名称，默认使用环境变量 LLM_MODEL 或 openrouter/google/gemini-2.5-flash
+        model: 模型名称，默认使用环境变量 LLM_MODEL
         api_key: API Key，默认使用环境变量 LLM_API_KEY
 
     Returns:
         str: 翻译后的中文内容，失败时返回空字符串
     """
-    model = model or os.getenv("LLM_MODEL", "openrouter/google/gemini-2.5-flash")
+    model = model or os.getenv("LLM_MODEL", "")
     api_key = api_key or os.getenv("LLM_API_KEY", "")
+
+    if not model:
+        print("LLM_MODEL 未设置，跳过翻译")
+        return ""
 
     if not api_key:
         print("翻译配置未设置，跳过翻译")
@@ -150,7 +153,6 @@ def translate_changelog(
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.3,
                 max_tokens=_TRANSLATE_MAX_TOKENS,
-                reasoning_effort=_REASONING_EFFORT,
             )
             if not response.choices or len(response.choices) == 0:
                 print("翻译失败: API 返回空结果")
@@ -200,8 +202,12 @@ def summarize_changelog(
     Returns:
         str: 英文要点 + 空行 + 中文要点，失败时返回空字符串
     """
-    model = model or os.getenv("LLM_MODEL", "openrouter/google/gemini-2.5-flash")
+    model = model or os.getenv("LLM_MODEL", "")
     api_key = api_key or os.getenv("LLM_API_KEY", "")
+
+    if not model:
+        print("LLM_MODEL 未设置，跳过总结生成")
+        return ""
 
     if not api_key:
         print("翻译配置未设置，跳过总结生成")
@@ -255,7 +261,6 @@ Release notes:
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,
             max_tokens=_SUMMARIZE_MAX_TOKENS,
-            reasoning_effort=_REASONING_EFFORT,
         )
         if not response.choices or len(response.choices) == 0:
             print("总结生成失败: API 返回空结果")

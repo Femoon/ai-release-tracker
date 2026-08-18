@@ -117,7 +117,7 @@ OPENCLAW_CHAT_ID=your_chat_id
 
 # AI 翻译（可选，未配置时仅发送英文）
 LLM_API_KEY=your_llm_api_key
-LLM_MODEL=openrouter/deepseek/deepseek-v4-flash  # 可选，指定翻译模型
+LLM_MODEL=openrouter/deepseek/deepseek-v4-flash-0731
 ```
 
 未配置时脚本正常运行，仅跳过对应功能。
