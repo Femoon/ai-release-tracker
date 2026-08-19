@@ -39,11 +39,20 @@ class TranslationPolicyTests(unittest.TestCase):
         self.assertIn("完整强度脱敏", restored)
         self.assertIn("上下文开销", restored)
 
-    def test_detects_and_repairs_reordered_placeholders(self):
+    def test_allows_placeholder_reordering_within_line(self):
         source = "- Agent uses Skill."
         document = protect(source)
         first, second = (item.token for item in document.placeholders)
         candidate = f"- {second} 使用 {first}。"
+
+        validation = validate(document, candidate)
+
+        self.assertTrue(validation.valid)
+
+    def test_detects_placeholder_moved_between_lines(self):
+        document = protect("- Agent works.\n- Skill works.")
+        first, second = (item.token for item in document.placeholders)
+        candidate = f"- {second} 可用。\n- {first} 可用。"
 
         validation = validate(document, candidate)
 
@@ -52,7 +61,7 @@ class TranslationPolicyTests(unittest.TestCase):
         repaired = apply_repair(
             candidate,
             validation.affected_lines,
-            '{"0": "- ' + first + " 使用 " + second + '。"}',
+            '{"0": "- ' + first + ' 可用。", "1": "- ' + second + ' 可用。"}',
         )
         self.assertTrue(validate(document, repaired).valid)
 

@@ -103,15 +103,19 @@ def _request_completion(
     api_key: str,
     messages: list[dict[str, str]],
     max_tokens: int,
+    response_format: dict | None = None,
 ) -> tuple[str, str]:
-    response = completion(
-        model=model,
-        api_key=api_key,
-        messages=messages,
-        temperature=0.3,
-        max_tokens=max_tokens,
-        extra_body=_REASONING_DISABLED,
-    )
+    kwargs = {
+        "model": model,
+        "api_key": api_key,
+        "messages": messages,
+        "temperature": 0.3,
+        "max_tokens": max_tokens,
+        "extra_body": _REASONING_DISABLED,
+    }
+    if response_format is not None:
+        kwargs["response_format"] = response_format
+    response = completion(**kwargs)
     if not response.choices:
         return "", "empty_choices"
     choice = response.choices[0]
@@ -221,41 +225,62 @@ def translate_changelog(
         validation = validate(document, candidate)
         if not validation.valid:
             if not validation.repairable:
-                print(f"翻译校验失败且无法局部修复: {', '.join(validation.reasons)}")
-                return ""
-            repair_prompt = (
-                "只修复以下失败行。返回一个 JSON 对象：key 是 line 数字，value 是修复后的完整行。"
-                "不要输出 Markdown 代码围栏。必须逐字保留每个 [[KEEP_...]] placeholder。\n\n"
-                + json.dumps(
-                    repair_items(document, candidate, validation),
-                    ensure_ascii=False,
-                )
-            )
-            try:
-                repaired_content, repair_finish_reason = _request_completion(
-                    model=model,
-                    api_key=api_key,
-                    messages=[
-                        {"role": "system", "content": _TRANSLATION_SYSTEM_PROMPT},
-                        {"role": "user", "content": repair_prompt},
-                    ],
-                    max_tokens=_TRANSLATE_MIN_TOKENS,
-                )
-                if not repaired_content or repair_finish_reason == "length":
-                    print("翻译修复失败: 返回空内容或输出被截断")
+                print("翻译结构校验失败，使用同一模型完整重试一次")
+                try:
+                    candidate, finish_reason = _request_completion(
+                        model=model,
+                        api_key=api_key,
+                        messages=messages,
+                        max_tokens=translation_max_tokens,
+                    )
+                except Exception as e:
+                    print(f"翻译重试失败: {e}")
                     return ""
-                candidate = apply_repair(
-                    candidate,
-                    validation.affected_lines,
-                    repaired_content,
-                )
-            except Exception as e:
-                print(f"翻译修复失败: {e}")
-                return ""
-            validation = validate(document, candidate)
+                if not candidate or finish_reason == "length":
+                    print(f"翻译重试无有效内容 (finish_reason={finish_reason})")
+                    return ""
+                validation = validate(document, candidate)
+                if not validation.valid and not validation.repairable:
+                    print(
+                        "翻译重试后仍无法局部修复: "
+                        + ", ".join(validation.reasons)
+                    )
+                    return ""
             if not validation.valid:
-                print(f"翻译修复后仍未通过校验: {', '.join(validation.reasons)}")
-                return ""
+                repair_prompt = (
+                    "只修复以下失败行。返回一个 JSON 对象：key 是 line 数字，value 是修复后的完整行。"
+                    "不要输出 Markdown 代码围栏。必须逐字保留每个 [[KEEP_...]] placeholder。\n\n"
+                    + json.dumps(
+                        repair_items(document, candidate, validation),
+                        ensure_ascii=False,
+                    )
+                )
+                try:
+                    repaired_content, repair_finish_reason = _request_completion(
+                        model=model,
+                        api_key=api_key,
+                        messages=[
+                            {"role": "system", "content": _TRANSLATION_SYSTEM_PROMPT},
+                            {"role": "user", "content": repair_prompt},
+                        ],
+                        max_tokens=_TRANSLATE_MIN_TOKENS,
+                        response_format={"type": "json_object"},
+                    )
+                    if not repaired_content or repair_finish_reason == "length":
+                        print("翻译修复失败: 返回空内容或输出被截断")
+                        return ""
+                    candidate = apply_repair(
+                        candidate,
+                        validation.affected_lines,
+                        repaired_content,
+                    )
+                except Exception as e:
+                    print(f"翻译修复失败: {e}")
+                    return ""
+                validation = validate(document, candidate)
+                if not validation.valid:
+                    print(f"翻译修复后仍未通过校验: {', '.join(validation.reasons)}")
+                    return ""
 
     translated = restore(document, candidate)
     if not _check_translation_quality(translated):

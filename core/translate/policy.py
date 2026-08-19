@@ -179,33 +179,28 @@ def _heading_signature(text: str) -> list[tuple[int, int]]:
 def validate(document: ProtectedDocument, candidate: str) -> ValidationResult:
     reasons: list[str] = []
     affected_lines: set[int] = set()
-    expected_tokens = [placeholder.token for placeholder in document.placeholders]
-    actual_tokens = _TOKEN_PATTERN.findall(candidate)
-    expected_counter = Counter(expected_tokens)
-    actual_counter = Counter(actual_tokens)
+    source_lines = document.protected.splitlines()
+    candidate_lines = candidate.splitlines()
 
+    # Placeholder order may change inside a sentence during translation, but a
+    # protected token must remain in its original source line. This catches
+    # cross-item moves without rejecting natural Chinese word order.
     token_issue_count = 0
-    for placeholder in document.placeholders:
-        difference = abs(
-            expected_counter[placeholder.token] - actual_counter[placeholder.token]
-        )
+    for line_index in range(min(len(source_lines), len(candidate_lines))):
+        expected_line = Counter(_TOKEN_PATTERN.findall(source_lines[line_index]))
+        actual_line = Counter(_TOKEN_PATTERN.findall(candidate_lines[line_index]))
+        missing = expected_line - actual_line
+        extra = actual_line - expected_line
+        difference = sum(missing.values()) + sum(extra.values())
         if difference:
             token_issue_count += difference
-            affected_lines.add(placeholder.line_index)
-    if expected_tokens != actual_tokens:
-        token_issue_count += sum(
-            expected != actual
-            for expected, actual in zip(expected_tokens, actual_tokens)
-        )
-        token_issue_count += abs(len(expected_tokens) - len(actual_tokens))
-        for index, placeholder in enumerate(document.placeholders):
-            if index >= len(actual_tokens) or placeholder.token != actual_tokens[index]:
-                affected_lines.add(placeholder.line_index)
+            affected_lines.add(line_index)
+    if len(source_lines) != len(candidate_lines):
+        for line in candidate_lines[min(len(source_lines), len(candidate_lines)) :]:
+            token_issue_count += len(_TOKEN_PATTERN.findall(line))
     if token_issue_count:
         reasons.append(f"placeholder violations: {token_issue_count}")
 
-    source_lines = document.protected.splitlines()
-    candidate_lines = candidate.splitlines()
     line_difference = abs(len(source_lines) - len(candidate_lines))
     if line_difference:
         reasons.append(f"line count difference: {line_difference}")

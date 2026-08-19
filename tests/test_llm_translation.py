@@ -63,26 +63,47 @@ class TranslateChangelogTests(unittest.TestCase):
     @patch("core.translate.llm.translation_cache.get", return_value=None)
     @patch("core.translate.llm.completion")
     def test_repair_changes_only_failed_line(self, mock_completion, _mock_get, mock_set):
-        document = protect(self.source)
-        lines = self.valid_candidate.splitlines()
+        source = "- Agent works.\n- Skill works."
+        document = protect(source)
         tokens = [placeholder.token for placeholder in document.placeholders]
-        lines[-1] = lines[-1].replace(tokens[1], "TEMP").replace(tokens[2], tokens[1]).replace("TEMP", tokens[2])
-        invalid_candidate = "\n".join(lines)
-        repaired_line = self.valid_candidate.splitlines()[-1]
+        invalid_candidate = f"- {tokens[1]} 可用。\n- {tokens[0]} 可用。"
         mock_completion.side_effect = [
             response(invalid_candidate),
-            response('{"2": ' + repr(repaired_line).replace("'", '"') + "}"),
+            response('{"0": "- ' + tokens[0] + ' 可用。", "1": "- ' + tokens[1] + ' 可用。"}'),
         ]
 
-        translated = translate_changelog(self.source, MODEL, API_KEY)
+        translated = translate_changelog(source, MODEL, API_KEY)
 
-        self.assertEqual(translated.splitlines()[:2], self.source.splitlines()[:2])
-        self.assertIn("Agent", translated)
+        self.assertEqual(translated, "- Agent 可用。\n- Skill 可用。")
         self.assertEqual(mock_completion.call_count, 2)
         self.assertEqual(
             [call.kwargs["model"] for call in mock_completion.call_args_list],
             [MODEL, MODEL],
         )
+        self.assertEqual(
+            mock_completion.call_args_list[1].kwargs["response_format"],
+            {"type": "json_object"},
+        )
+        mock_set.assert_called_once()
+
+    @patch("core.translate.llm.translation_cache.set")
+    @patch("core.translate.llm.translation_cache.get", return_value=None)
+    @patch("core.translate.llm.completion")
+    def test_nonrepairable_structure_retries_full_translation(self, mock_completion, _mock_get, mock_set):
+        source = "- Agent works.\n- Skill works."
+        document = protect(source)
+        lines = document.protected.splitlines()
+        merged_candidate = " ".join(lines)
+        valid_candidate = "\n".join(line.replace("works.", "可用。") for line in lines)
+        mock_completion.side_effect = [
+            response(merged_candidate),
+            response(valid_candidate),
+        ]
+
+        translated = translate_changelog(source, MODEL, API_KEY)
+
+        self.assertEqual(translated, "- Agent 可用。\n- Skill 可用。")
+        self.assertEqual(mock_completion.call_count, 2)
         mock_set.assert_called_once()
 
     @patch("core.translate.llm.translation_cache.set")
