@@ -1,0 +1,294 @@
+"""Deterministic protection and validation for changelog translations."""
+
+from __future__ import annotations
+
+import json
+import re
+from collections import Counter
+from dataclasses import dataclass
+
+
+KEEP_TERMS = (
+    "Model Context Protocol",
+    "Background Task",
+    "Thinking Block",
+    "Transcript Mode",
+    "reasoning effort",
+    "Remote Control",
+    "Plugin marketplace",
+    "context window",
+    "prompt cache",
+    "Permission",
+    "Frontmatter",
+    "Sub-agent",
+    "multi-agent",
+    "Subagent",
+    "WebSocket",
+    "Streaming",
+    "Sandbox",
+    "Tool Use",
+    "Tool Call",
+    "Bash Tool",
+    "Memory",
+    "Prompt",
+    "Plugin",
+    "Skill",
+    "Agent",
+    "Hook",
+    "OAuth",
+    "Token",
+    "worktree",
+    "auto mode",
+    "Focus view",
+    "Compact Mode",
+    "Plan Mode",
+    "Code Mode",
+    "exec_command",
+    "apply_patch",
+    "MCP",
+    "TUI",
+    "LLM",
+    "CLI",
+    "SDK",
+    "API",
+)
+
+FIXED_TRANSLATIONS = {
+    "context cost": "上下文开销",
+    "newer models": "更新的模型",
+    "full-strength redaction": "完整强度脱敏",
+}
+
+TERMINOLOGY_INSTRUCTION = (
+    "专业术语规则：CLI 专业术语（包括大小写和复数变体）必须保留英文；"
+    "不确定的产品功能名保留英文。"
+)
+
+
+@dataclass(frozen=True)
+class Placeholder:
+    token: str
+    source: str
+    replacement: str
+    line_index: int
+
+
+@dataclass(frozen=True)
+class ProtectedDocument:
+    source: str
+    protected: str
+    placeholders: tuple[Placeholder, ...]
+
+
+@dataclass(frozen=True)
+class ValidationResult:
+    valid: bool
+    issue_count: int
+    affected_lines: frozenset[int]
+    repairable: bool
+    reasons: tuple[str, ...]
+
+
+def _keep_phrase_pattern() -> str:
+    patterns = []
+    for phrase in sorted(KEEP_TERMS, key=len, reverse=True):
+        escaped = re.escape(phrase)
+        if phrase == "Memory":
+            escaped = r"Memor(?:y|ies)"
+        elif phrase == "Sandbox":
+            escaped = r"Sandbox(?:es)?"
+        elif phrase[-1].isalpha() and not phrase.endswith("s"):
+            escaped = rf"{escaped}s?"
+        patterns.append(escaped)
+    return "|".join(patterns)
+
+
+_KEEP_PATTERN_TEXT = _keep_phrase_pattern()
+_FIXED_PATTERN_TEXT = "|".join(
+    re.escape(phrase) for phrase in sorted(FIXED_TRANSLATIONS, key=len, reverse=True)
+)
+_PROTECTION_PATTERN = re.compile(
+    rf"```[\s\S]*?```|`[^`\n]+`|https?://[^\s)>]+|"
+    rf"(?<![\w@])@[A-Za-z0-9][A-Za-z0-9_-]*|"
+    rf"(?<![A-Za-z0-9_])(?:{_FIXED_PATTERN_TEXT})(?![A-Za-z0-9_])|"
+    rf"(?<![A-Za-z0-9_])(?i:{_KEEP_PATTERN_TEXT})(?![A-Za-z0-9_])|"
+    rf"(?<![A-Za-z0-9_])v?\d+(?:\.\d+){{1,3}}(?:[-+][A-Za-z0-9_.-]+)?(?![A-Za-z0-9_])"
+)
+_TOKEN_PATTERN = re.compile(r"\[\[KEEP_\d{4}_[0-9A-F]{4}\]\]")
+
+
+def protect(content: str) -> ProtectedDocument:
+    placeholders: list[Placeholder] = []
+    parts: list[str] = []
+    cursor = 0
+    line_index = 0
+    for match in _PROTECTION_PATTERN.finditer(content):
+        before = content[cursor : match.start()]
+        parts.append(before)
+        line_index += before.count("\n")
+        source = match.group(0)
+        if source.lower() in {"agent", "agents"} and re.search(
+            r"\b(?:proxy|user)\s+$", content[max(0, match.start() - 12) : match.start()], re.I
+        ):
+            parts.append(source)
+            cursor = match.end()
+            continue
+        suffix = f"{sum(source.encode('utf-8')) & 0xFFFF:04X}"
+        token = f"[[KEEP_{len(placeholders):04d}_{suffix}]]"
+        if token in content:
+            raise ValueError(f"placeholder collision: {token}")
+        placeholders.append(
+            Placeholder(
+                token=token,
+                source=source,
+                replacement=FIXED_TRANSLATIONS.get(source, source),
+                line_index=line_index,
+            )
+        )
+        parts.append(token)
+        cursor = match.end()
+    parts.append(content[cursor:])
+    return ProtectedDocument(content, "".join(parts), tuple(placeholders))
+
+
+def restore(document: ProtectedDocument, candidate: str) -> str:
+    restored = candidate
+    for placeholder in document.placeholders:
+        restored = restored.replace(placeholder.token, placeholder.replacement)
+    return re.sub(r"(?<=[\u4e00-\u9fff]) +(?=[\u4e00-\u9fff])", "", restored)
+
+
+def _bullet_signature(text: str) -> list[tuple[int, str, int]]:
+    signature = []
+    for index, line in enumerate(text.splitlines()):
+        match = re.match(r"^(\s*)([-*+•]|\d+[.)])\s+", line)
+        if match:
+            signature.append((index, match.group(2), len(match.group(1))))
+    return signature
+
+
+def _heading_signature(text: str) -> list[tuple[int, int]]:
+    signature = []
+    for index, line in enumerate(text.splitlines()):
+        match = re.match(r"^(#{1,6})\s+", line)
+        if match:
+            signature.append((index, len(match.group(1))))
+    return signature
+
+
+def validate(document: ProtectedDocument, candidate: str) -> ValidationResult:
+    reasons: list[str] = []
+    affected_lines: set[int] = set()
+    expected_tokens = [placeholder.token for placeholder in document.placeholders]
+    actual_tokens = _TOKEN_PATTERN.findall(candidate)
+    expected_counter = Counter(expected_tokens)
+    actual_counter = Counter(actual_tokens)
+
+    token_issue_count = 0
+    for placeholder in document.placeholders:
+        difference = abs(
+            expected_counter[placeholder.token] - actual_counter[placeholder.token]
+        )
+        if difference:
+            token_issue_count += difference
+            affected_lines.add(placeholder.line_index)
+    if expected_tokens != actual_tokens:
+        token_issue_count += sum(
+            expected != actual
+            for expected, actual in zip(expected_tokens, actual_tokens)
+        )
+        token_issue_count += abs(len(expected_tokens) - len(actual_tokens))
+        for index, placeholder in enumerate(document.placeholders):
+            if index >= len(actual_tokens) or placeholder.token != actual_tokens[index]:
+                affected_lines.add(placeholder.line_index)
+    if token_issue_count:
+        reasons.append(f"placeholder violations: {token_issue_count}")
+
+    source_lines = document.protected.splitlines()
+    candidate_lines = candidate.splitlines()
+    line_difference = abs(len(source_lines) - len(candidate_lines))
+    if line_difference:
+        reasons.append(f"line count difference: {line_difference}")
+
+    source_bullets = _bullet_signature(document.protected)
+    candidate_bullets = _bullet_signature(candidate)
+    bullet_difference = 0
+    for index in range(min(len(source_bullets), len(candidate_bullets))):
+        if source_bullets[index] != candidate_bullets[index]:
+            bullet_difference += 1
+            affected_lines.add(source_bullets[index][0])
+    bullet_difference += abs(len(source_bullets) - len(candidate_bullets))
+    if bullet_difference:
+        reasons.append(f"bullet structure violations: {bullet_difference}")
+
+    source_headings = _heading_signature(document.protected)
+    candidate_headings = _heading_signature(candidate)
+    heading_difference = 0
+    for index in range(min(len(source_headings), len(candidate_headings))):
+        if source_headings[index] != candidate_headings[index]:
+            heading_difference += 1
+            affected_lines.add(source_headings[index][0])
+    heading_difference += abs(len(source_headings) - len(candidate_headings))
+    if heading_difference:
+        reasons.append(f"heading structure violations: {heading_difference}")
+
+    issue_count = token_issue_count + line_difference + bullet_difference + heading_difference
+    repairable = (
+        len(source_lines) == len(candidate_lines)
+        and len(source_bullets) == len(candidate_bullets)
+        and len(source_headings) == len(candidate_headings)
+        and bool(affected_lines)
+    )
+    return ValidationResult(
+        valid=issue_count == 0,
+        issue_count=issue_count,
+        affected_lines=frozenset(affected_lines),
+        repairable=repairable,
+        reasons=tuple(reasons),
+    )
+
+
+def repair_items(
+    document: ProtectedDocument,
+    candidate: str,
+    validation: ValidationResult,
+) -> list[dict[str, object]]:
+    source_lines = document.protected.splitlines()
+    candidate_lines = candidate.splitlines()
+    items = []
+    for line_index in sorted(validation.affected_lines):
+        items.append(
+            {
+                "line": line_index,
+                "source": source_lines[line_index],
+                "current_translation": candidate_lines[line_index],
+                "errors": list(validation.reasons),
+            }
+        )
+    return items
+
+
+def apply_repair(
+    candidate: str,
+    affected_lines: frozenset[int],
+    response_content: str,
+) -> str:
+    raw = response_content.strip()
+    if raw.startswith("```"):
+        raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.IGNORECASE)
+    parsed = json.loads(raw)
+    if not isinstance(parsed, dict):
+        raise ValueError("repair response must be a JSON object")
+    if isinstance(parsed.get("line"), int) and isinstance(parsed.get("repaired"), str):
+        replacements = {str(parsed["line"]): parsed["repaired"]}
+    else:
+        replacements = {
+            str(key): value for key, value in parsed.items() if isinstance(value, str)
+        }
+
+    candidate_lines = candidate.splitlines()
+    for line_index in sorted(affected_lines):
+        replacement = replacements.get(str(line_index))
+        if replacement is not None:
+            candidate_lines[line_index] = replacement
+    return "\n".join(candidate_lines)

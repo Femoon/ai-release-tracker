@@ -4,18 +4,24 @@
 翻译模块 - 使用 LiteLLM 调用 LLM API 进行翻译
 """
 
+import json
 import os
 import re
 from litellm import completion
 
 from core.translate import cache as translation_cache
+from core.translate.policy import (
+    TERMINOLOGY_INSTRUCTION,
+    apply_repair,
+    protect,
+    repair_items,
+    restore,
+    validate,
+)
 
 
 # 翻译质量检查：中文字符最低占比
 MIN_CHINESE_RATIO = 0.05  # 5%
-# 最大重试次数（仅对"内容相关"的失败如质量不达标生效；致命错误立即失败不重试）
-MAX_RETRIES = 1
-
 # 致命错误关键词：命中后立即终止重试，不再继续消耗 API 配额
 # 包含两类：
 # - 额度/配额类（重试也无济于事，且仍会扣费）：max_tokens / credits / 402 / quota / insufficient
@@ -36,23 +42,27 @@ _FATAL_ERROR_KEYWORDS = (
 
 # 显式给 LiteLLM completion 设置输出上限，避免 OpenRouter 默认 65536 触发
 # "requires more credits / fewer max_tokens" 402 错误
-_TRANSLATE_MAX_TOKENS = 16384
+_TRANSLATE_MIN_TOKENS = 8192
+_TRANSLATE_MAX_TOKENS = 32768
 _SUMMARIZE_MAX_TOKENS = 4096
+_TRANSLATION_CACHE_KIND = "translate_guarded_v1"
 # summarize 的输入截断阈值：prompt 要求输出 < 2000 字符摘要，输入超过此阈值
 # 时只保留前面部分（通常包含 Highlights / Breaking / New Features 等高价值段落），
 # 避免把 70k+ 字符的 changelog 整个塞给 LLM 浪费输入 token
 _SUMMARIZE_INPUT_TRUNCATE_CHARS = 24000
 
-_TERMINOLOGY_INSTRUCTION = (
-    "专业术语规则（必须遵守）：以下 CLI 术语及其大小写、单复数、连字符变体必须原样保留："
-    "API, SDK, CLI, Token, OAuth, WebSocket, Streaming, LLM, Prompt, Agent, Subagent, "
-    "Sub-agent, multi-agent, Skill, Hook, Plugin, MCP, Model Context Protocol, TUI, Sandbox, "
-    "worktree, prompt cache, context window, reasoning effort, Tool Use, Tool Call, Bash Tool, "
-    "Permission, Thinking Block, Frontmatter, Background Task, Memory, Transcript Mode, "
-    "exec_command, apply_patch, Remote Control, Code Mode, Plan Mode, Compact Mode, Focus view, "
-    "auto mode。Agent 仅在表示 CLI 协作执行单元时保留英文；proxy、user agent 等其他含义"
-    "按语境翻译。不确定的产品功能名保留英文。"
-)
+_TRANSLATION_SYSTEM_PROMPT = """你是技术软件更新日志翻译器。只输出中文译文，不输出解释。
+
+要求：
+- 逐行翻译，禁止总结、合并、删除或重新组织内容
+- 保持标题、列表项数量、顺序、缩进和 Markdown 格式不变
+- 每个形如 [[KEEP_0000_ABCD]] 的 placeholder 必须逐字复制一次，禁止改写、删除、重复或重排
+- 不要添加原文没有的标题、前言、结尾或说明
+- commit 前缀 fix/feat/chore 等保留英文
+- 中文表达自然、准确，符合技术文档习惯
+"""
+
+_REASONING_DISABLED = {"reasoning": {"effort": "none"}}
 
 
 def _is_fatal_error(err: Exception) -> bool:
@@ -87,6 +97,38 @@ def _check_translation_quality(translated: str) -> bool:
     return chinese_ratio >= MIN_CHINESE_RATIO
 
 
+def _request_completion(
+    *,
+    model: str,
+    api_key: str,
+    messages: list[dict[str, str]],
+    max_tokens: int,
+) -> tuple[str, str]:
+    response = completion(
+        model=model,
+        api_key=api_key,
+        messages=messages,
+        temperature=0.3,
+        max_tokens=max_tokens,
+        extra_body=_REASONING_DISABLED,
+    )
+    if not response.choices:
+        return "", "empty_choices"
+    choice = response.choices[0]
+    content = choice.message.content or ""
+    return content.strip(), str(choice.finish_reason or "")
+
+
+def _translation_max_tokens(content: str) -> int:
+    """Size visible-output budget from source length, bounded for cost control."""
+    estimated_source_tokens = max(1, (len(content) + 2) // 3)
+    estimated_output_tokens = estimated_source_tokens * 2 + 1024
+    return min(
+        _TRANSLATE_MAX_TOKENS,
+        max(_TRANSLATE_MIN_TOKENS, estimated_output_tokens),
+    )
+
+
 def translate_changelog(
     content: str,
     model: str = None,
@@ -114,76 +156,127 @@ def translate_changelog(
         print("翻译配置未设置，跳过翻译")
         return ""
 
-    cached = translation_cache.get(content, model, kind="translate")
+    cached = translation_cache.get(content, model, kind=_TRANSLATION_CACHE_KIND)
     if cached:
         print(f"翻译缓存命中 (跳过 LLM 调用, {len(cached)} 字符)")
         return cached
 
-    prompt = f"""请将以下软件更新日志逐条翻译成中文，直接输出翻译结果。
+    try:
+        document = protect(content)
+    except ValueError as e:
+        print(f"翻译失败: 无法保护原文 ({e})")
+        return ""
 
-关键要求（必须严格遵守）：
-- 逐行翻译，禁止总结、合并或重新组织内容
-- 每个列表项（以 - 或 • 开头的行）必须单独翻译，不能合并成段落
-- 保持原文的结构和格式不变，翻译后的行数应与原文基本一致
-- 不要添加标题、摘要或任何原文没有的内容
+    messages = [
+        {"role": "system", "content": _TRANSLATION_SYSTEM_PROMPT},
+        {"role": "user", "content": f"<SOURCE>\n{document.protected}\n</SOURCE>"},
+    ]
+    translation_max_tokens = _translation_max_tokens(content)
+    print(f"翻译输出上限: {translation_max_tokens} tokens (reasoning 已关闭)")
 
-翻译示例（必须遵守）：
-- "• Added new feature" → "• 新增功能"
-- "• Fixed bug in API" → "• 修复 API 中的错误"
-- "• Changed default behavior" → "• 变更默认行为"
-- "• Removed deprecated option" → "• 移除已弃用的选项"
-- "- fix: resolve issue" → "- fix: 解决问题"（commit 前缀 fix/feat/chore 等保留英文）
+    candidate = ""
+    finish_reason = ""
+    first_call_failed = False
+    try:
+        candidate, finish_reason = _request_completion(
+            model=model,
+            api_key=api_key,
+            messages=messages,
+            max_tokens=translation_max_tokens,
+        )
+    except Exception as e:
+        print(f"翻译失败: {e}")
+        if _is_fatal_error(e):
+            print("翻译失败: 检测到致命错误，终止重试")
+            return ""
+        first_call_failed = True
 
-格式要求：
-1. 保持 Markdown 格式不变（标题、列表、代码块等）
-2. 版本号、行内代码保持原样
-3. GitHub 用户名、斜杠命令、配置文件名保持原样
-4. 语言流畅自然，符合中文技术文档习惯
+    if finish_reason == "length":
+        print("翻译失败: 输出达到 max_tokens，拒绝截断结果")
+        return ""
 
-{_TERMINOLOGY_INSTRUCTION}
-
-待翻译内容：
-{content}"""
-
-    for attempt in range(MAX_RETRIES + 1):
+    # 空内容或可重试异常只重试同一个完整请求一次；重试后不再进入修复路径。
+    if first_call_failed or not candidate:
+        print("翻译返回空内容或临时失败，使用同一模型重试一次")
         try:
-            response = completion(
+            candidate, finish_reason = _request_completion(
                 model=model,
                 api_key=api_key,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.3,
-                max_tokens=_TRANSLATE_MAX_TOKENS,
+                messages=messages,
+                max_tokens=translation_max_tokens,
             )
-            if not response.choices or len(response.choices) == 0:
-                print("翻译失败: API 返回空结果")
-                continue
-
-            translated = response.choices[0].message.content.strip()
-
-            # 检查翻译质量
-            if _check_translation_quality(translated):
-                chinese_count = _count_chinese_chars(translated)
-                chinese_ratio = chinese_count / len(translated) * 100
-                print(f"翻译完成 (中文占比: {chinese_ratio:.1f}%)")
-                translation_cache.set(content, model, translated, kind="translate")
-                return translated
-            else:
-                chinese_count = _count_chinese_chars(translated)
-                chinese_ratio = chinese_count / len(translated) * 100 if translated else 0
-                print(f"翻译质量不合格 (中文占比: {chinese_ratio:.1f}%，要求 >= {MIN_CHINESE_RATIO * 100}%)")
-                if attempt < MAX_RETRIES:
-                    print(f"重试翻译 ({attempt + 2}/{MAX_RETRIES + 1})...")
-
         except Exception as e:
             print(f"翻译失败: {e}")
             if _is_fatal_error(e):
-                print("翻译失败: 检测到致命错误（额度/credits/max_tokens），终止重试")
+                print("翻译失败: 检测到致命错误，终止重试")
+            return ""
+        if not candidate or finish_reason == "length":
+            print(f"翻译失败: 第二次调用无有效内容 (finish_reason={finish_reason})")
+            return ""
+        validation = validate(document, candidate)
+        if not validation.valid:
+            print(f"翻译校验失败: {', '.join(validation.reasons)}")
+            return ""
+    else:
+        validation = validate(document, candidate)
+        if not validation.valid:
+            if not validation.repairable:
+                print(f"翻译校验失败且无法局部修复: {', '.join(validation.reasons)}")
                 return ""
-            if attempt < MAX_RETRIES:
-                print(f"重试翻译 ({attempt + 2}/{MAX_RETRIES + 1})...")
+            repair_prompt = (
+                "只修复以下失败行。返回一个 JSON 对象：key 是 line 数字，value 是修复后的完整行。"
+                "不要输出 Markdown 代码围栏。必须逐字保留每个 [[KEEP_...]] placeholder。\n\n"
+                + json.dumps(
+                    repair_items(document, candidate, validation),
+                    ensure_ascii=False,
+                )
+            )
+            try:
+                repaired_content, repair_finish_reason = _request_completion(
+                    model=model,
+                    api_key=api_key,
+                    messages=[
+                        {"role": "system", "content": _TRANSLATION_SYSTEM_PROMPT},
+                        {"role": "user", "content": repair_prompt},
+                    ],
+                    max_tokens=_TRANSLATE_MIN_TOKENS,
+                )
+                if not repaired_content or repair_finish_reason == "length":
+                    print("翻译修复失败: 返回空内容或输出被截断")
+                    return ""
+                candidate = apply_repair(
+                    candidate,
+                    validation.affected_lines,
+                    repaired_content,
+                )
+            except Exception as e:
+                print(f"翻译修复失败: {e}")
+                return ""
+            validation = validate(document, candidate)
+            if not validation.valid:
+                print(f"翻译修复后仍未通过校验: {', '.join(validation.reasons)}")
+                return ""
 
-    print("翻译失败: 已达到最大重试次数")
-    return ""
+    translated = restore(document, candidate)
+    if not _check_translation_quality(translated):
+        chinese_count = _count_chinese_chars(translated)
+        chinese_ratio = chinese_count / len(translated) * 100 if translated else 0
+        print(
+            f"翻译质量不合格 (中文占比: {chinese_ratio:.1f}%，"
+            f"要求 >= {MIN_CHINESE_RATIO * 100}%)"
+        )
+        return ""
+
+    chinese_count = _count_chinese_chars(translated)
+    chinese_ratio = chinese_count / len(translated) * 100
+    print(f"翻译完成 (中文占比: {chinese_ratio:.1f}%)")
+    translation_cache.set(
+        content,
+        model,
+        translated,
+        kind=_TRANSLATION_CACHE_KIND,
+    )
+    return translated
 
 
 def summarize_changelog(
@@ -227,7 +320,7 @@ def summarize_changelog(
         )
         summarize_input = summarize_input[:_SUMMARIZE_INPUT_TRUNCATE_CHARS]
 
-    prompt = f"""Please extract the 3-8 most important updates from the following release notes and produce a concise bilingual summary.
+    summary_system = f"""Please extract 3-8 important updates from release notes and produce a concise bilingual summary.
 
 Requirements:
 - Output format: English bullet points first, then a blank line, then Chinese bullet points
@@ -238,7 +331,7 @@ Requirements:
 - Skip minor internal changes, dependency bumps, and trivial fixes
 - Keep each point to one line, concise and clear
 
-{_TERMINOLOGY_INSTRUCTION}
+{TERMINOLOGY_INSTRUCTION}
 
 Example output format:
 *Key Updates:*
@@ -251,22 +344,32 @@ Example output format:
 • 修复 Y 组件中的关键错误
 • 破坏性变更：Z API 现在需要认证
 
-Release notes:
-{summarize_input}"""
+Only output the summary in the demonstrated format."""
 
     try:
         response = completion(
             model=model,
             api_key=api_key,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": summary_system},
+                {"role": "user", "content": summarize_input},
+            ],
             temperature=0.3,
             max_tokens=_SUMMARIZE_MAX_TOKENS,
+            extra_body=_REASONING_DISABLED,
         )
         if not response.choices or len(response.choices) == 0:
             print("总结生成失败: API 返回空结果")
             return ""
 
-        summary = response.choices[0].message.content.strip()
+        choice = response.choices[0]
+        if str(choice.finish_reason or "") == "length":
+            print("总结生成失败: 输出达到 max_tokens")
+            return ""
+        summary = (choice.message.content or "").strip()
+        if not summary:
+            print("总结生成失败: API 返回空内容")
+            return ""
         print(f"更新要点总结生成完成 ({len(summary)} 字符)")
         # 用原始 content 作为缓存键，避免截断后查不到
         translation_cache.set(content, model, summary, kind="summarize")
