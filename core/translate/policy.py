@@ -179,24 +179,41 @@ def _heading_signature(text: str) -> list[tuple[int, int]]:
 def validate(document: ProtectedDocument, candidate: str) -> ValidationResult:
     reasons: list[str] = []
     affected_lines: set[int] = set()
-    source_lines = document.protected.splitlines()
-    candidate_lines = candidate.splitlines()
+    source_physical_lines = document.protected.splitlines()
+    candidate_physical_lines = candidate.splitlines()
+    source_lines = [
+        (index, line)
+        for index, line in enumerate(source_physical_lines)
+        if line.strip()
+    ]
+    candidate_lines = [
+        (index, line)
+        for index, line in enumerate(candidate_physical_lines)
+        if line.strip()
+    ]
 
     # Placeholder order may change inside a sentence during translation, but a
     # protected token must remain in its original source line. This catches
-    # cross-item moves without rejecting natural Chinese word order.
+    # cross-item moves without rejecting natural Chinese word order. Blank
+    # lines are formatting only and do not change logical line ownership.
     token_issue_count = 0
     for line_index in range(min(len(source_lines), len(candidate_lines))):
-        expected_line = Counter(_TOKEN_PATTERN.findall(source_lines[line_index]))
-        actual_line = Counter(_TOKEN_PATTERN.findall(candidate_lines[line_index]))
+        source_physical_index, source_line = source_lines[line_index]
+        _, candidate_line = candidate_lines[line_index]
+        expected_line = Counter(_TOKEN_PATTERN.findall(source_line))
+        actual_line = Counter(_TOKEN_PATTERN.findall(candidate_line))
         missing = expected_line - actual_line
         extra = actual_line - expected_line
         difference = sum(missing.values()) + sum(extra.values())
         if difference:
             token_issue_count += difference
-            affected_lines.add(line_index)
+            affected_lines.add(source_physical_index)
     if len(source_lines) != len(candidate_lines):
-        for line in candidate_lines[min(len(source_lines), len(candidate_lines)) :]:
+        shared_count = min(len(source_lines), len(candidate_lines))
+        for source_physical_index, line in source_lines[shared_count:]:
+            token_issue_count += len(_TOKEN_PATTERN.findall(line))
+            affected_lines.add(source_physical_index)
+        for _, line in candidate_lines[shared_count:]:
             token_issue_count += len(_TOKEN_PATTERN.findall(line))
     if token_issue_count:
         reasons.append(f"placeholder violations: {token_issue_count}")
@@ -205,31 +222,37 @@ def validate(document: ProtectedDocument, candidate: str) -> ValidationResult:
     if line_difference:
         reasons.append(f"line count difference: {line_difference}")
 
-    source_bullets = _bullet_signature(document.protected)
-    candidate_bullets = _bullet_signature(candidate)
+    source_logical_text = "\n".join(line for _, line in source_lines)
+    candidate_logical_text = "\n".join(line for _, line in candidate_lines)
+    source_bullets = _bullet_signature(source_logical_text)
+    candidate_bullets = _bullet_signature(candidate_logical_text)
     bullet_difference = 0
     for index in range(min(len(source_bullets), len(candidate_bullets))):
         if source_bullets[index] != candidate_bullets[index]:
             bullet_difference += 1
-            affected_lines.add(source_bullets[index][0])
+            affected_lines.add(source_lines[source_bullets[index][0]][0])
     bullet_difference += abs(len(source_bullets) - len(candidate_bullets))
     if bullet_difference:
         reasons.append(f"bullet structure violations: {bullet_difference}")
 
-    source_headings = _heading_signature(document.protected)
-    candidate_headings = _heading_signature(candidate)
+    source_headings = _heading_signature(source_logical_text)
+    candidate_headings = _heading_signature(candidate_logical_text)
     heading_difference = 0
     for index in range(min(len(source_headings), len(candidate_headings))):
         if source_headings[index] != candidate_headings[index]:
             heading_difference += 1
-            affected_lines.add(source_headings[index][0])
+            affected_lines.add(source_lines[source_headings[index][0]][0])
     heading_difference += abs(len(source_headings) - len(candidate_headings))
     if heading_difference:
         reasons.append(f"heading structure violations: {heading_difference}")
 
     issue_count = token_issue_count + line_difference + bullet_difference + heading_difference
+    blank_layout_same = [not line.strip() for line in source_physical_lines] == [
+        not line.strip() for line in candidate_physical_lines
+    ]
     repairable = (
-        len(source_lines) == len(candidate_lines)
+        blank_layout_same
+        and len(source_lines) == len(candidate_lines)
         and len(source_bullets) == len(candidate_bullets)
         and len(source_headings) == len(candidate_headings)
         and bool(affected_lines)

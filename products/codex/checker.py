@@ -465,6 +465,9 @@ def main():
         # 去掉 Changelog 详细列表后再翻译
         original_content = _strip_changelog_section(latest_content) if latest_content else "（暂无更新说明）"
         translated = translate_changelog(original_content) if latest_content else ""
+        if latest_content and original_content.strip() and not translated:
+            print("⚠️  翻译失败，停止推送；下次检查将重新尝试")
+            return 1
 
         # 发送 Telegram 通知
         notify_result = send_bilingual_notification(
@@ -549,6 +552,9 @@ def main():
                 # 去掉 Changelog 详细列表后再翻译
                 original_content = _strip_changelog_section(latest_content) if latest_content else "（暂无更新说明）"
                 translated = translate_changelog(original_content) if latest_content else ""
+                if latest_content and original_content.strip() and not translated:
+                    print("⚠️  翻译失败，停止编辑；保留现有消息状态以便下次重试")
+                    return 1
 
                 # 编辑之前发送的消息
                 edit_result = edit_bilingual_notification(
@@ -594,11 +600,6 @@ def main():
         else:
             print("（暂无更新说明）")
         print("-" * 50)
-        if not save_version(latest_tag):
-            print("⚠️ 版本记录保存失败，停止推送以避免重复")
-            return 1
-        print("版本信息已更新")
-
         # 去掉 Changelog 详细列表后再翻译
         original_content = _strip_changelog_section(latest_content) if latest_content else "（暂无更新说明）"
         translated = translate_changelog(original_content) if latest_content else ""
@@ -622,6 +623,15 @@ def main():
             print(f"调试内容已保存到: {debug_output}")
         except Exception as e:
             print(f"⚠️ 调试文件写入失败: {e}（不影响主流程）")
+
+        if latest_content and original_content.strip() and not translated:
+            print("⚠️  翻译失败，停止推送；版本状态未更新，下次检查将重新尝试")
+            return 1
+
+        if not save_version(latest_tag):
+            print("⚠️ 版本记录保存失败，停止推送以避免重复")
+            return 1
+        print("版本信息已更新")
 
         # 发送 Telegram 通知
         notify_result = send_bilingual_notification(

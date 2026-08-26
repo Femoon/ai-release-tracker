@@ -65,6 +65,14 @@ class TranslationPolicyTests(unittest.TestCase):
         )
         self.assertTrue(validate(document, repaired).valid)
 
+    def test_allows_blank_line_changes_without_losing_structure(self):
+        document = protect("**New Features**\n\n- Agent works.\n- Skill works.")
+        candidate = document.protected.replace("\n\n", "\n")
+
+        validation = validate(document, candidate)
+
+        self.assertTrue(validation.valid)
+
     def test_line_count_change_is_not_repairable(self):
         document = protect("## 1.2.3\n\n- Agent works.")
         candidate = document.protected + "\nextra"
