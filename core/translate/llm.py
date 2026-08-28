@@ -13,8 +13,11 @@ from core.translate import cache as translation_cache
 from core.translate.policy import (
     TERMINOLOGY_INSTRUCTION,
     apply_repair,
+    degraded_tolerance,
+    is_acceptable_degradation,
     protect,
     repair_items,
+    repair_placeholders,
     restore,
     validate,
 )
@@ -46,6 +49,9 @@ _TRANSLATE_MIN_TOKENS = 8192
 _TRANSLATE_MAX_TOKENS = 32768
 _SUMMARIZE_MAX_TOKENS = 4096
 _TRANSLATION_CACHE_KIND = "translate_guarded_v1"
+# 定向修复最多处理的失败行数：超过说明整份译文的 placeholder 大面积错乱，
+# 重新翻译比逐行修复更划算也更可靠
+_REPAIR_MAX_LINES = 12
 # summarize 的输入截断阈值：prompt 要求输出 < 2000 字符摘要，输入超过此阈值
 # 时只保留前面部分（通常包含 Highlights / Breaking / New Features 等高价值段落），
 # 避免把 70k+ 字符的 changelog 整个塞给 LLM 浪费输入 token
@@ -63,6 +69,26 @@ _TRANSLATION_SYSTEM_PROMPT = """你是技术软件更新日志翻译器。只输
 """
 
 _REASONING_DISABLED = {"reasoning": {"effort": "none"}}
+
+
+def _build_extra_body() -> dict:
+    """
+    构造 OpenRouter extra_body：关闭 reasoning，并可选固定 provider。
+
+    OpenRouter 会把同一个模型 slug 路由到不同 provider（量化/质量不同），
+    翻译质量方差很大。设置 LLM_PROVIDER_ONLY（逗号分隔）可以把请求固定到
+    指定 provider 白名单，例如 LLM_PROVIDER_ONLY=fireworks,deepinfra,together。
+    未设置时不限制路由。注意 provider 需要和账号的数据策略兼容，否则会 404。
+    """
+    extra_body = dict(_REASONING_DISABLED)
+    providers = [
+        p.strip()
+        for p in os.getenv("LLM_PROVIDER_ONLY", "").split(",")
+        if p.strip()
+    ]
+    if providers:
+        extra_body["provider"] = {"only": providers}
+    return extra_body
 
 
 def _is_fatal_error(err: Exception) -> bool:
@@ -111,7 +137,7 @@ def _request_completion(
         "messages": messages,
         "temperature": 0.3,
         "max_tokens": max_tokens,
-        "extra_body": _REASONING_DISABLED,
+        "extra_body": _build_extra_body(),
     }
     if response_format is not None:
         kwargs["response_format"] = response_format
@@ -121,6 +147,42 @@ def _request_completion(
     choice = response.choices[0]
     content = choice.message.content or ""
     return content.strip(), str(choice.finish_reason or "")
+
+
+def _is_locally_repairable(validation) -> bool:
+    """
+    只有失败面足够小才值得定向修复。
+
+    OpenRouter 会把同一个模型 slug 路由到不同 provider（量化不同），偶尔会返回
+    placeholder 大面积错乱的译文。这种整份不可信的结果应该重新翻译，而不是花一次
+    调用去修几十行。
+    """
+    return validation.repairable and len(validation.affected_lines) <= _REPAIR_MAX_LINES
+
+
+def _validate_candidate(document, candidate: str):
+    """先做确定性 placeholder 修复，再校验。返回 (候选译文, 校验结果)。"""
+    validation = validate(document, candidate)
+    if validation.valid:
+        return candidate, validation
+
+    repaired, removed = repair_placeholders(document, candidate)
+    if not removed:
+        return candidate, validation
+
+    print(f"确定性修复: 移除 {removed} 个多余 placeholder")
+    return repaired, validate(document, repaired)
+
+
+def _accept_degraded(document, validation) -> bool:
+    """结构完好且 placeholder 偏差极少时降级放行，避免整段译文被丢弃。"""
+    if not is_acceptable_degradation(document, validation):
+        return False
+    print(
+        f"翻译降级放行: placeholder 偏差 {validation.token_issue_count} 处"
+        f"（阈值 {degraded_tolerance(len(document.placeholders))}，结构校验通过）"
+    )
+    return True
 
 
 def _translation_max_tokens(content: str) -> int:
@@ -199,8 +261,11 @@ def translate_changelog(
         print("翻译失败: 输出达到 max_tokens，拒绝截断结果")
         return ""
 
-    # 空内容或可重试异常只重试同一个完整请求一次；重试后不再进入修复路径。
+    # 空内容或可重试异常只重试同一个完整请求一次。整个流程最多 3 次模型调用：
+    # 首次翻译 + 一次完整重试 + 一次定向修复。
+    full_retry_used = False
     if first_call_failed or not candidate:
+        full_retry_used = True
         print("翻译返回空内容或临时失败，使用同一模型重试一次")
         try:
             candidate, finish_reason = _request_completion(
@@ -217,70 +282,77 @@ def translate_changelog(
         if not candidate or finish_reason == "length":
             print(f"翻译失败: 第二次调用无有效内容 (finish_reason={finish_reason})")
             return ""
-        validation = validate(document, candidate)
-        if not validation.valid:
-            print(f"翻译校验失败: {', '.join(validation.reasons)}")
+
+    candidate, validation = _validate_candidate(document, candidate)
+
+    if not validation.valid and not _is_locally_repairable(validation) and not full_retry_used:
+        print(f"翻译校验失败 ({', '.join(validation.reasons)})，使用同一模型完整重试一次")
+        try:
+            candidate, finish_reason = _request_completion(
+                model=model,
+                api_key=api_key,
+                messages=messages,
+                max_tokens=translation_max_tokens,
+            )
+        except Exception as e:
+            print(f"翻译重试失败: {e}")
             return ""
-    else:
-        validation = validate(document, candidate)
-        if not validation.valid:
-            if not validation.repairable:
-                print("翻译结构校验失败，使用同一模型完整重试一次")
-                try:
-                    candidate, finish_reason = _request_completion(
-                        model=model,
-                        api_key=api_key,
-                        messages=messages,
-                        max_tokens=translation_max_tokens,
-                    )
-                except Exception as e:
-                    print(f"翻译重试失败: {e}")
-                    return ""
-                if not candidate or finish_reason == "length":
-                    print(f"翻译重试无有效内容 (finish_reason={finish_reason})")
-                    return ""
-                validation = validate(document, candidate)
-                if not validation.valid and not validation.repairable:
-                    print(
-                        "翻译重试后仍无法局部修复: "
-                        + ", ".join(validation.reasons)
-                    )
-                    return ""
-            if not validation.valid:
-                repair_prompt = (
-                    "只修复以下失败行。返回一个 JSON 对象：key 是 line 数字，value 是修复后的完整行。"
-                    "不要输出 Markdown 代码围栏。必须逐字保留每个 [[KEEP_...]] placeholder。\n\n"
-                    + json.dumps(
-                        repair_items(document, candidate, validation),
-                        ensure_ascii=False,
-                    )
+        if not candidate or finish_reason == "length":
+            print(f"翻译重试无有效内容 (finish_reason={finish_reason})")
+            return ""
+        candidate, validation = _validate_candidate(document, candidate)
+
+    if not validation.valid and _is_locally_repairable(validation):
+        print(
+            f"翻译校验失败 ({', '.join(validation.reasons)})，"
+            f"定向修复 {len(validation.affected_lines)} 个失败行"
+        )
+        repair_prompt = (
+            "只修复以下失败行。返回一个 JSON 对象：key 是 line 数字，value 是修复后的完整行。"
+            "不要输出 Markdown 代码围栏。必须逐字保留每个 [[KEEP_...]] placeholder："
+            "补回 missing_placeholders 中的每一项，删除 extra_placeholders 中多出的重复。\n\n"
+            + json.dumps(
+                repair_items(document, candidate, validation),
+                ensure_ascii=False,
+            )
+        )
+        try:
+            repaired_content, repair_finish_reason = _request_completion(
+                model=model,
+                api_key=api_key,
+                messages=[
+                    {"role": "system", "content": _TRANSLATION_SYSTEM_PROMPT},
+                    {"role": "user", "content": repair_prompt},
+                ],
+                max_tokens=_TRANSLATE_MIN_TOKENS,
+                response_format={"type": "json_object"},
+            )
+            if not repaired_content or repair_finish_reason == "length":
+                print("翻译修复失败: 返回空内容或输出被截断")
+            else:
+                repaired_candidate = apply_repair(
+                    candidate,
+                    validation.affected_lines,
+                    repaired_content,
                 )
-                try:
-                    repaired_content, repair_finish_reason = _request_completion(
-                        model=model,
-                        api_key=api_key,
-                        messages=[
-                            {"role": "system", "content": _TRANSLATION_SYSTEM_PROMPT},
-                            {"role": "user", "content": repair_prompt},
-                        ],
-                        max_tokens=_TRANSLATE_MIN_TOKENS,
-                        response_format={"type": "json_object"},
+                repaired_candidate, repaired_validation = _validate_candidate(
+                    document, repaired_candidate
+                )
+                # 修复可能改坏原本正确的行，只在整体严格变好时才采用
+                if repaired_validation.issue_count < validation.issue_count:
+                    candidate, validation = repaired_candidate, repaired_validation
+                else:
+                    print(
+                        f"翻译修复未改善 (修复后 {repaired_validation.issue_count} 处，"
+                        f"修复前 {validation.issue_count} 处)，保留修复前结果"
                     )
-                    if not repaired_content or repair_finish_reason == "length":
-                        print("翻译修复失败: 返回空内容或输出被截断")
-                        return ""
-                    candidate = apply_repair(
-                        candidate,
-                        validation.affected_lines,
-                        repaired_content,
-                    )
-                except Exception as e:
-                    print(f"翻译修复失败: {e}")
-                    return ""
-                validation = validate(document, candidate)
-                if not validation.valid:
-                    print(f"翻译修复后仍未通过校验: {', '.join(validation.reasons)}")
-                    return ""
+        except Exception as e:
+            print(f"翻译修复失败: {e}")
+
+    if not validation.valid:
+        print(f"翻译修复后仍未通过校验: {', '.join(validation.reasons)}")
+        if not _accept_degraded(document, validation):
+            return ""
 
     translated = restore(document, candidate)
     if not _check_translation_quality(translated):
@@ -381,7 +453,7 @@ Only output the summary in the demonstrated format."""
             ],
             temperature=0.3,
             max_tokens=_SUMMARIZE_MAX_TOKENS,
-            extra_body=_REASONING_DISABLED,
+            extra_body=_build_extra_body(),
         )
         if not response.choices or len(response.choices) == 0:
             print("总结生成失败: API 返回空结果")

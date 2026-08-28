@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 from collections import Counter
 from dataclasses import dataclass
@@ -81,12 +82,33 @@ class ProtectedDocument:
 
 
 @dataclass(frozen=True)
+class TokenDiff:
+    """单个逻辑行上的 placeholder 差异，用于给模型精确的修复指令。"""
+
+    line_index: int
+    missing: tuple[str, ...]
+    extra: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class ValidationResult:
     valid: bool
     issue_count: int
     affected_lines: frozenset[int]
     repairable: bool
     reasons: tuple[str, ...]
+    token_issue_count: int = 0
+    structure_issue_count: int = 0
+    token_diffs: tuple[TokenDiff, ...] = ()
+
+
+# 降级放行阈值：结构完好、只剩少量 placeholder 偏差时，宁可接受略有瑕疵的
+# 中文译文，也不要整段丢弃只发英文。
+# 短文本（placeholder 少于 DEGRADED_MIN_PLACEHOLDERS）不降级：那里一处偏差
+# 占比很高，且重试/修复成本低，继续 fail closed。
+DEGRADED_MIN_PLACEHOLDERS = 20
+DEGRADED_TOKEN_TOLERANCE_RATIO = 0.05
+DEGRADED_TOKEN_TOLERANCE_MAX = 10
 
 
 def _keep_phrase_pattern() -> str:
@@ -197,6 +219,7 @@ def validate(document: ProtectedDocument, candidate: str) -> ValidationResult:
     # cross-item moves without rejecting natural Chinese word order. Blank
     # lines are formatting only and do not change logical line ownership.
     token_issue_count = 0
+    token_diffs: list[TokenDiff] = []
     for line_index in range(min(len(source_lines), len(candidate_lines))):
         source_physical_index, source_line = source_lines[line_index]
         _, candidate_line = candidate_lines[line_index]
@@ -208,6 +231,13 @@ def validate(document: ProtectedDocument, candidate: str) -> ValidationResult:
         if difference:
             token_issue_count += difference
             affected_lines.add(source_physical_index)
+            token_diffs.append(
+                TokenDiff(
+                    line_index=source_physical_index,
+                    missing=tuple(sorted(missing.elements())),
+                    extra=tuple(sorted(extra.elements())),
+                )
+            )
     if len(source_lines) != len(candidate_lines):
         shared_count = min(len(source_lines), len(candidate_lines))
         for source_physical_index, line in source_lines[shared_count:]:
@@ -246,7 +276,8 @@ def validate(document: ProtectedDocument, candidate: str) -> ValidationResult:
     if heading_difference:
         reasons.append(f"heading structure violations: {heading_difference}")
 
-    issue_count = token_issue_count + line_difference + bullet_difference + heading_difference
+    structure_issue_count = line_difference + bullet_difference + heading_difference
+    issue_count = token_issue_count + structure_issue_count
     blank_layout_same = [not line.strip() for line in source_physical_lines] == [
         not line.strip() for line in candidate_physical_lines
     ]
@@ -263,7 +294,97 @@ def validate(document: ProtectedDocument, candidate: str) -> ValidationResult:
         affected_lines=frozenset(affected_lines),
         repairable=repairable,
         reasons=tuple(reasons),
+        token_issue_count=token_issue_count,
+        structure_issue_count=structure_issue_count,
+        token_diffs=tuple(token_diffs),
     )
+
+
+def _drop_token_occurrences(line: str, token: str, count: int) -> str:
+    """从行尾开始删除 count 个 token，保留最前面的合法出现。"""
+    for _ in range(count):
+        index = line.rfind(token)
+        if index < 0:
+            break
+        end = index + len(token)
+        if line[end : end + 1] == " ":
+            end += 1
+        elif index > 0 and line[index - 1] == " ":
+            index -= 1
+        line = line[:index] + line[end:]
+    return line
+
+
+def repair_placeholders(document: ProtectedDocument, candidate: str) -> tuple[str, int]:
+    """
+    确定性修复：删除模型多复制出来的 placeholder。
+
+    只删除在“所属逻辑行”和“全文”同时超量的 token，因此不会误删跨行搬移的
+    token（那类问题仍交给模型定向修复）。中文自然语序常把同一个术语重复一次
+    （例如 "禁用 X 时 X 报告失败"），这类偏差机械可修，不该整段丢弃译文。
+
+    Returns:
+        (修复后的候选译文, 删除的 placeholder 数量)
+    """
+    source_lines = [line for line in document.protected.splitlines() if line.strip()]
+    candidate_physical = candidate.splitlines()
+    candidate_indices = [
+        index for index, line in enumerate(candidate_physical) if line.strip()
+    ]
+    if len(source_lines) != len(candidate_indices):
+        return candidate, 0
+
+    surplus = Counter(_TOKEN_PATTERN.findall(candidate)) - Counter(
+        _TOKEN_PATTERN.findall(document.protected)
+    )
+    if not surplus:
+        return candidate, 0
+
+    removed = 0
+    for logical_index, physical_index in enumerate(candidate_indices):
+        expected = Counter(_TOKEN_PATTERN.findall(source_lines[logical_index]))
+        line = candidate_physical[physical_index]
+        actual = Counter(_TOKEN_PATTERN.findall(line))
+        for token, count in (actual - expected).items():
+            drop = min(count, surplus[token])
+            if drop <= 0:
+                continue
+            line = _drop_token_occurrences(line, token, drop)
+            surplus[token] -= drop
+            removed += drop
+        candidate_physical[physical_index] = line
+
+    if not removed:
+        return candidate, 0
+    return "\n".join(candidate_physical), removed
+
+
+def degraded_tolerance(placeholder_count: int) -> int:
+    """允许降级放行的 placeholder 偏差上限；0 表示不允许降级。"""
+    if placeholder_count < DEGRADED_MIN_PLACEHOLDERS:
+        return 0
+    scaled = math.ceil(placeholder_count * DEGRADED_TOKEN_TOLERANCE_RATIO)
+    return min(DEGRADED_TOKEN_TOLERANCE_MAX, max(1, scaled))
+
+
+def is_acceptable_degradation(
+    document: ProtectedDocument,
+    validation: ValidationResult,
+) -> bool:
+    """
+    判断能否降级接受这份译文。
+
+    结构（行数、列表项、标题）必须完好；只有少量 placeholder 偏差时，还原术语后
+    最坏结果是个别术语缺失或重复，仍远好于只发英文原文。
+    """
+    if validation.valid:
+        return True
+    if validation.structure_issue_count:
+        return False
+    tolerance = degraded_tolerance(len(document.placeholders))
+    if not tolerance:
+        return False
+    return 0 < validation.token_issue_count <= tolerance
 
 
 def repair_items(
@@ -273,13 +394,17 @@ def repair_items(
 ) -> list[dict[str, object]]:
     source_lines = document.protected.splitlines()
     candidate_lines = candidate.splitlines()
+    diffs = {diff.line_index: diff for diff in validation.token_diffs}
     items = []
     for line_index in sorted(validation.affected_lines):
+        diff = diffs.get(line_index)
         items.append(
             {
                 "line": line_index,
                 "source": source_lines[line_index],
                 "current_translation": candidate_lines[line_index],
+                "missing_placeholders": list(diff.missing) if diff else [],
+                "extra_placeholders": list(diff.extra) if diff else [],
                 "errors": list(validation.reasons),
             }
         )

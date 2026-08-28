@@ -226,6 +226,10 @@ def main():
 
         # 发送 Telegram 通知
         translated = translate_changelog(push_content)
+        if push_content.strip() and not translated:
+            print("翻译失败，停止推送；强制模式未修改本地记录，可直接重跑")
+            return 1
+
         notify_result = send_bilingual_notification(
             version=push_version,
             original=push_content,
@@ -281,6 +285,9 @@ def main():
                 print("检测到 CHANGELOG 已更新，正在编辑之前发送的通知...")
 
                 translated = translate_changelog(latest_content)
+                if latest_content.strip() and not translated:
+                    print("翻译失败，停止编辑；保留现有消息状态以便下次重试")
+                    return 1
 
                 edit_result = edit_bilingual_notification(
                     message_ids=saved_message_ids,
@@ -320,13 +327,19 @@ def main():
         except UnicodeEncodeError:
             print("(内容包含特殊字符，已跳过终端显示)")
         print("-" * 50)
+        # 先翻译再落版本号：翻译失败时保持版本状态不变，下次检查会重新尝试，
+        # 否则一次翻译失败会让这个版本永久只有英文。
+        translated = translate_changelog(latest_content)
+        if latest_content.strip() and not translated:
+            print("翻译失败，停止推送；版本状态未更新，下次检查将重新尝试")
+            return 1
+
         if not save_version(latest_version):
             print("版本记录保存失败，停止推送以避免重复")
             return 1
         print("版本信息已更新")
 
         # 发送 Telegram 通知
-        translated = translate_changelog(latest_content)
         notify_result = send_bilingual_notification(
             version=latest_version,
             original=latest_content,

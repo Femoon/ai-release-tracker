@@ -121,6 +121,9 @@ export OPENCLAW_CHAT_ID="your_openclaw_chat_id"
 ```bash
 export LLM_API_KEY="your_llm_api_key"
 export LLM_MODEL="openrouter/deepseek/deepseek-v4-flash-0731"
+
+# 可选：固定 OpenRouter provider（逗号分隔），避免多 provider 路由导致的翻译质量方差
+export LLM_PROVIDER_ONLY="fireworks,deepinfra,together"
 ```
 
 未配置时跳过翻译，仅发送英文原文。
@@ -200,6 +203,8 @@ OPENCLAW_CHAT_ID=your_openclaw_chat_id
 # AI 翻译配置
 LLM_API_KEY=your_llm_api_key
 LLM_MODEL=openrouter/deepseek/deepseek-v4-flash-0731
+# 可选：固定 OpenRouter provider，降低翻译质量方差
+LLM_PROVIDER_ONLY=fireworks,deepinfra,together
 
 # GitHub API 配置（可选，避免 API 速率限制）
 # 注意：不要使用 GITHUB_TOKEN（GitHub Actions 保留变量）

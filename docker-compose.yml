@@ -12,6 +12,7 @@ services:
       - OPENCLAW_CHAT_ID=${OPENCLAW_CHAT_ID:-}
       - LLM_API_KEY=${LLM_API_KEY:-}
       - LLM_MODEL=${LLM_MODEL:-}
+      - LLM_PROVIDER_ONLY=${LLM_PROVIDER_ONLY:-}
       - GH_TOKEN=${GH_TOKEN:-}
       - TELEGRAPH_ACCESS_TOKEN=${TELEGRAPH_ACCESS_TOKEN:-}
     volumes:

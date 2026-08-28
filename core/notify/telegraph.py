@@ -314,6 +314,10 @@ def publish_changelog(
     # 构建文章标题
     page_title = f"{title} {version} Release Notes" if version else f"{title} Release Notes"
 
+    # 防御性告警：译文为空时文章只有英文，容易被误认为翻译成功
+    if not (translated or "").strip():
+        print("⚠️  Telegraph 发布：译文为空，文章将只包含英文原文")
+
     # 获取产品对应的作者信息
     author_info = PRODUCT_AUTHORS.get(title, {})
     author_name = author_info.get("name")
