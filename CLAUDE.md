@@ -121,10 +121,13 @@ export OPENCLAW_CHAT_ID="your_openclaw_chat_id"
 
 ```bash
 export LLM_API_KEY="your_llm_api_key"
-export LLM_MODEL="openrouter/deepseek/deepseek-v4-flash-0731"
+export LLM_MODEL="openrouter/z-ai/glm-5.3-flash"
 
 # 可选：固定 OpenRouter provider（逗号分隔），避免多 provider 路由导致的翻译质量方差
-export LLM_PROVIDER_ONLY="fireworks,deepinfra,together"
+export LLM_PROVIDER_ONLY="z-ai"
+
+# 可选：reasoning effort，默认 none（关闭思考）；强制思考的模型（如 GLM）需设为 minimal
+export LLM_REASONING_EFFORT="minimal"
 ```
 
 未配置时跳过翻译，仅发送英文原文。
@@ -203,9 +206,11 @@ OPENCLAW_CHAT_ID=your_openclaw_chat_id
 
 # AI 翻译配置
 LLM_API_KEY=your_llm_api_key
-LLM_MODEL=openrouter/deepseek/deepseek-v4-flash-0731
+LLM_MODEL=openrouter/z-ai/glm-5.3-flash
 # 可选：固定 OpenRouter provider，降低翻译质量方差
-LLM_PROVIDER_ONLY=fireworks,deepinfra,together
+LLM_PROVIDER_ONLY=z-ai
+# 可选：reasoning effort（GLM 强制思考，需 minimal）
+LLM_REASONING_EFFORT=minimal
 
 # GitHub API 配置（可选，避免 API 速率限制）
 # 注意：不要使用 GITHUB_TOKEN（GitHub Actions 保留变量）

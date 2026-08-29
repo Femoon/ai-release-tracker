@@ -68,19 +68,30 @@ _TRANSLATION_SYSTEM_PROMPT = """你是技术软件更新日志翻译器。只输
 - 中文表达自然、准确，符合技术文档习惯
 """
 
-_REASONING_DISABLED = {"reasoning": {"effort": "none"}}
+_DEFAULT_REASONING_EFFORT = "none"
+
+
+def _reasoning_effort() -> str:
+    """
+    reasoning effort，通过 LLM_REASONING_EFFORT 配置，默认 none（关闭思考）。
+
+    部分模型（如 GLM 5.3 Flash）强制开启思考，effort=none 会被所有 provider
+    以 400 拒绝，这类模型需要配置 minimal/low。思考 token 计入 max_tokens
+    输出预算，effort 越高翻译越容易被截断。
+    """
+    return os.getenv("LLM_REASONING_EFFORT", "").strip() or _DEFAULT_REASONING_EFFORT
 
 
 def _build_extra_body() -> dict:
     """
-    构造 OpenRouter extra_body：关闭 reasoning，并可选固定 provider。
+    构造 OpenRouter extra_body：设置 reasoning effort，并可选固定 provider。
 
     OpenRouter 会把同一个模型 slug 路由到不同 provider（量化/质量不同），
     翻译质量方差很大。设置 LLM_PROVIDER_ONLY（逗号分隔）可以把请求固定到
     指定 provider 白名单，例如 LLM_PROVIDER_ONLY=fireworks,deepinfra,together。
     未设置时不限制路由。注意 provider 需要和账号的数据策略兼容，否则会 404。
     """
-    extra_body = dict(_REASONING_DISABLED)
+    extra_body = {"reasoning": {"effort": _reasoning_effort()}}
     providers = [
         p.strip()
         for p in os.getenv("LLM_PROVIDER_ONLY", "").split(",")
@@ -238,7 +249,7 @@ def translate_changelog(
         {"role": "user", "content": f"<SOURCE>\n{document.protected}\n</SOURCE>"},
     ]
     translation_max_tokens = _translation_max_tokens(content)
-    print(f"翻译输出上限: {translation_max_tokens} tokens (reasoning 已关闭)")
+    print(f"翻译输出上限: {translation_max_tokens} tokens (reasoning effort: {_reasoning_effort()})")
 
     candidate = ""
     finish_reason = ""

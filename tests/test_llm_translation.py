@@ -246,9 +246,16 @@ class BuildExtraBodyTests(unittest.TestCase):
         import os
 
         os.environ.pop("LLM_PROVIDER_ONLY", None)
+        os.environ.pop("LLM_REASONING_EFFORT", None)
         from core.translate.llm import _build_extra_body
 
         self.assertEqual(_build_extra_body(), {"reasoning": {"effort": "none"}})
+
+    @patch.dict("os.environ", {"LLM_REASONING_EFFORT": "minimal"})
+    def test_reasoning_effort_env_override(self):
+        from core.translate.llm import _build_extra_body
+
+        self.assertEqual(_build_extra_body()["reasoning"], {"effort": "minimal"})
 
     @patch.dict("os.environ", {"LLM_PROVIDER_ONLY": "deepseek"})
     def test_single_provider_is_pinned(self):
@@ -266,7 +273,10 @@ class BuildExtraBodyTests(unittest.TestCase):
             _build_extra_body()["provider"], {"only": ["deepseek", "fireworks"]}
         )
 
-    @patch.dict("os.environ", {"LLM_PROVIDER_ONLY": "deepseek"})
+    @patch.dict(
+        "os.environ",
+        {"LLM_PROVIDER_ONLY": "deepseek", "LLM_REASONING_EFFORT": "none"},
+    )
     @patch("core.translate.llm.translation_cache.set")
     @patch("core.translate.llm.translation_cache.get", return_value=None)
     @patch("core.translate.llm.completion")
