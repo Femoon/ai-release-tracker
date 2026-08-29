@@ -20,6 +20,7 @@ uv run python products/claude_code/checker.py --force -V 2.1.49   # 强制推送
 # 单独检查 OpenAI Codex 版本更新（排除 alpha 版本）
 uv run python products/codex/checker.py
 uv run python products/codex/checker.py --force        # 强制推送最新版本（测试用，不更新记录）
+uv run python products/codex/checker.py --force -V 0.149.0  # 强制推送指定版本（通过 API 按 tag 获取，测试用）
 
 # 批量推送 Claude Code 历史版本到 Telegram（默认推送 3 个）
 uv run python products/claude_code/pusher.py

@@ -402,10 +402,64 @@ def main():
     parser = argparse.ArgumentParser(description="OpenAI Codex 版本更新检查脚本")
     parser.add_argument("-f", "--force", action="store_true",
                        help="强制推送最新版本（跳过版本比对，不更新记录）")
+    parser.add_argument("-V", "--target-version", type=str, default=None,
+                       help="指定推送的版本号（需配合 --force 使用，如 --force -V 0.149.0）")
     args = parser.parse_args()
+
+    if args.target_version is not None and not args.force:
+        print("错误: --target-version 需配合 --force 使用")
+        return 1
+
+    if args.target_version is not None and not re.fullmatch(r'\d+\.\d+\.\d+', args.target_version):
+        print(f"错误: 版本号格式不正确 '{args.target_version}'，期望格式如 0.149.0")
+        return 1
 
     print("正在检查 OpenAI Codex 更新...")
     print("-" * 50)
+
+    # 强制模式 + 指定版本：直接通过 API 按 tag 获取（老版本可能已不在 feed 里）
+    if args.force and args.target_version:
+        tag_name = f"rust-v{args.target_version}"
+        print(f"强制模式：通过 API 获取指定版本 (tag: {tag_name})")
+        release_data, status = verify_release_via_api(tag_name)
+        if status != "stable":
+            print(f"⚠️  获取指定版本失败: {status}")
+            return 1
+
+        target_title = release_data.get("name") or args.target_version
+        target_content = clean_release_body(release_data.get("body", ""))
+        target_link = release_data.get("html_url", "")
+        print("-" * 50)
+        print("更新内容：")
+        try:
+            print(target_content)
+        except UnicodeEncodeError:
+            print("(内容包含特殊字符，已跳过终端显示)")
+        print("-" * 50)
+
+        # 去掉 Changelog 详细列表后再翻译
+        original_content = _strip_changelog_section(target_content) if target_content else "（暂无更新说明）"
+        translated = translate_changelog(original_content) if target_content else ""
+        if target_content and original_content.strip() and not translated:
+            print("⚠️  翻译失败，停止推送；强制模式未修改本地记录，可直接重跑")
+            return 1
+
+        notify_result = send_bilingual_notification(
+            version=target_title,
+            original=original_content,
+            translated=translated,
+            title="OpenAI Codex",
+            bot_token=TELEGRAM_BOT_TOKEN,
+            chat_id=TELEGRAM_CHAT_ID,
+            version_url=target_link
+        )
+
+        if not notify_result["success"]:
+            print("⚠️  Telegram 通知发送失败")
+            return 1
+
+        print(f"✓ 版本 {target_title} 推送完成（强制模式，未更新本地记录）")
+        return 0
 
     # 显示 GitHub Token 状态
     if GITHUB_TOKEN:
