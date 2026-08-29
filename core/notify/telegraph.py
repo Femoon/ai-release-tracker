@@ -6,6 +6,7 @@ Telegraph 发布模块
 用于将超长内容发布到 Telegraph，并返回文章链接
 """
 
+import html as html_lib
 import json
 import os
 import re
@@ -14,6 +15,10 @@ import requests
 
 # Telegraph API 基础 URL
 TELEGRAPH_API = "https://api.telegra.ph"
+
+# 代码占位符：转换期间先把代码内容抽出来，避免内部的 _ < > 被后续规则破坏
+INLINE_CODE_PLACEHOLDER = "\x00CODE{}\x00"
+BLOCK_CODE_PLACEHOLDER = "\x00PRE{}\x00"
 
 
 def get_token() -> str | None:
@@ -46,16 +51,33 @@ def markdown_to_html(text: str) -> str:
     Returns:
         str: HTML 格式文本
     """
+    # 先抽出代码块和行内代码，用占位符保护
+    # 代码内容不能参与 HTML 转义前的强调解析，否则 `rate_limits.spend_limit`
+    # 里的下划线会被当成斜体语法
+    block_codes: list[str] = []
+    inline_codes: list[str] = []
+
+    def _save_block_code(match: re.Match) -> str:
+        block_codes.append(match.group(1))
+        return BLOCK_CODE_PLACEHOLDER.format(len(block_codes) - 1)
+
+    def _save_inline_code(match: re.Match) -> str:
+        inline_codes.append(match.group(1))
+        return INLINE_CODE_PLACEHOLDER.format(len(inline_codes) - 1)
+
+    # 处理代码块 ```code``` -> 占位符
+    text = re.sub(r'```[\w]*\n(.*?)\n```', _save_block_code, text, flags=re.DOTALL)
+
+    # 处理行内代码 `code` -> 占位符
+    text = re.sub(r'`([^`]+)`', _save_inline_code, text)
+
+    # 转义普通文本里的 HTML 特殊字符，否则 <id> 之类内容会被当成标签吃掉
+    text = html_lib.escape(text, quote=False)
+
     # 处理标题 ## -> <h3>, ### -> <h4>
     text = re.sub(r'^## (.+)$', r'<h3>\1</h3>', text, flags=re.MULTILINE)
     text = re.sub(r'^### (.+)$', r'<h4>\1</h4>', text, flags=re.MULTILINE)
     text = re.sub(r'^# (.+)$', r'<h3>\1</h3>', text, flags=re.MULTILINE)
-
-    # 处理代码块 ```code``` -> <pre>code</pre>
-    text = re.sub(r'```[\w]*\n(.*?)\n```', r'<pre>\1</pre>', text, flags=re.DOTALL)
-
-    # 处理行内代码 `code` -> <code>code</code>
-    text = re.sub(r'`([^`]+)`', r'<code>\1</code>', text)
 
     # 处理粗体 **text** 或 __text__ -> <b>text</b>
     text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
@@ -92,7 +114,10 @@ def markdown_to_html(text: str) -> str:
                 list_items = []
             # 处理普通段落（非空行且不是标签）
             stripped = line.strip()
-            if stripped and not stripped.startswith('<'):
+            if re.fullmatch(r'\x00PRE\d+\x00', stripped):
+                # 代码块占位符本身是块级元素，不再包 <p>
+                result_lines.append(stripped)
+            elif stripped and not stripped.startswith('<'):
                 result_lines.append(f"<p>{stripped}</p>")
             elif stripped:
                 result_lines.append(stripped)
@@ -101,7 +126,21 @@ def markdown_to_html(text: str) -> str:
     if in_list:
         result_lines.append("<ul>" + "".join(list_items) + "</ul>")
 
-    return "\n".join(result_lines)
+    html_text = "\n".join(result_lines)
+
+    # 还原代码占位符，代码内容单独做 HTML 转义
+    for idx, code in enumerate(inline_codes):
+        html_text = html_text.replace(
+            INLINE_CODE_PLACEHOLDER.format(idx),
+            f"<code>{html_lib.escape(code, quote=False)}</code>"
+        )
+    for idx, code in enumerate(block_codes):
+        html_text = html_text.replace(
+            BLOCK_CODE_PLACEHOLDER.format(idx),
+            f"<pre>{html_lib.escape(code, quote=False)}</pre>"
+        )
+
+    return html_text
 
 
 def create_page(
@@ -195,7 +234,7 @@ def html_to_nodes(html: str) -> list:
             if attrs_str:
                 href_match = re.search(r'href=["\']([^"\']+)["\']', attrs_str)
                 if href_match:
-                    node["attrs"] = {"href": href_match.group(1)}
+                    node["attrs"] = {"href": html_lib.unescape(href_match.group(1))}
 
             # 递归处理子内容
             if tag == "ul":
@@ -208,24 +247,26 @@ def html_to_nodes(html: str) -> list:
                     if "<" in li_content:
                         li_children = html_to_nodes(li_content)
                     else:
-                        li_children = [li_content] if li_content else []
+                        li_children = [html_lib.unescape(li_content)] if li_content else []
                     children.append({"tag": "li", "children": li_children})
                 node["children"] = children
             elif "<" in inner:
                 # 内部还有标签，递归处理
                 node["children"] = html_to_nodes(inner)
             else:
-                # 纯文本
-                node["children"] = [inner] if inner else []
+                # 纯文本（Node 里的文本是明文，需要把 HTML 实体还原回来）
+                node["children"] = [html_lib.unescape(inner)] if inner else []
 
             nodes.append(node)
         elif match.group(4):  # 自闭合标签 (hr, br)
             tag = match.group(4)
             nodes.append({"tag": tag})
         elif match.group(5):  # 纯文本
-            text = match.group(5).strip()
-            if text:
-                nodes.append(text)
+            text = match.group(5)
+            # 纯空白片段是块级标签之间的换行，直接丢弃；
+            # 其余文本保留首尾空格，否则行内 <code> 两侧的空格会被吞掉
+            if text.strip():
+                nodes.append(html_lib.unescape(text))
 
     return nodes
 
