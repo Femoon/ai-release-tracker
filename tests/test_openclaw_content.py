@@ -70,6 +70,25 @@ class OpenClawContentTests(unittest.TestCase):
         self.assertIn("### HIGHLIGHTS", selected)
         self.assertNotIn("### Changes", selected)
 
+    def test_removes_issue_references_and_contributor_credits(self):
+        content = """## 2026.8.1
+
+### Highlights
+
+- **Find conversations:** search past conversations. (#105057, #105635) Thanks @hercial61.
+- **Use dashboards:** pin widgets. (#101840) Thanks @one, @two, and @three.
+- **Keep mentions:** notify @owner when work finishes.
+"""
+
+        selected = select_notification_content(content)
+
+        self.assertIn("- **Find conversations:** search past conversations.", selected)
+        self.assertIn("- **Use dashboards:** pin widgets.", selected)
+        self.assertIn("notify @owner when work finishes", selected)
+        self.assertNotIn("#105057", selected)
+        self.assertNotIn("#101840", selected)
+        self.assertNotIn("Thanks @", selected)
+
 
 if __name__ == "__main__":
     unittest.main()
