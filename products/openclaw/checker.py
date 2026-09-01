@@ -19,6 +19,7 @@ load_dotenv()
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from core.notify.telegram import edit_bilingual_notification, send_bilingual_notification
 from core.translate import translate_changelog
+from products.openclaw.content import select_notification_content
 from core.state import (
     compute_body_hash,
     read_message_state as _read_message_state,
@@ -224,15 +225,16 @@ def main():
             print("(内容包含特殊字符，已跳过终端显示)")
         print("-" * 50)
 
-        # 发送 Telegram 通知
-        translated = translate_changelog(push_content)
-        if push_content.strip() and not translated:
+        # 有 Highlights 时只展示 Highlights；否则跳过逐条 Fixes。
+        notification_content = select_notification_content(push_content)
+        translated = translate_changelog(notification_content)
+        if notification_content.strip() and not translated:
             print("翻译失败，停止推送；强制模式未修改本地记录，可直接重跑")
             return 1
 
         notify_result = send_bilingual_notification(
             version=push_version,
-            original=push_content,
+            original=notification_content,
             translated=translated,
             title="OpenClaw",
             bot_token=TELEGRAM_BOT_TOKEN,
@@ -260,7 +262,8 @@ def main():
         print(f"当前已是最新版本 ({latest_version})")
 
         # 检查 body 是否有变化（用于处理开发者延迟修改 CHANGELOG 的情况）
-        current_body_hash = compute_body_hash(latest_content)
+        notification_content = select_notification_content(latest_content)
+        current_body_hash = compute_body_hash(notification_content)
         message_state = read_message_state()
 
         if message_state and message_state.get("version") == latest_version:
@@ -284,15 +287,15 @@ def main():
                 print("-" * 50)
                 print("检测到 CHANGELOG 已更新，正在编辑之前发送的通知...")
 
-                translated = translate_changelog(latest_content)
-                if latest_content.strip() and not translated:
+                translated = translate_changelog(notification_content)
+                if notification_content.strip() and not translated:
                     print("翻译失败，停止编辑；保留现有消息状态以便下次重试")
                     return 1
 
                 edit_result = edit_bilingual_notification(
                     message_ids=saved_message_ids,
                     version=latest_version,
-                    original=latest_content,
+                    original=notification_content,
                     translated=translated,
                     title="OpenClaw",
                     bot_token=TELEGRAM_BOT_TOKEN,
@@ -329,8 +332,9 @@ def main():
         print("-" * 50)
         # 先翻译再落版本号：翻译失败时保持版本状态不变，下次检查会重新尝试，
         # 否则一次翻译失败会让这个版本永久只有英文。
-        translated = translate_changelog(latest_content)
-        if latest_content.strip() and not translated:
+        notification_content = select_notification_content(latest_content)
+        translated = translate_changelog(notification_content)
+        if notification_content.strip() and not translated:
             print("翻译失败，停止推送；版本状态未更新，下次检查将重新尝试")
             return 1
 
@@ -342,7 +346,7 @@ def main():
         # 发送 Telegram 通知
         notify_result = send_bilingual_notification(
             version=latest_version,
-            original=latest_content,
+            original=notification_content,
             translated=translated,
             title="OpenClaw",
             bot_token=TELEGRAM_BOT_TOKEN,
@@ -356,7 +360,7 @@ def main():
 
         # 保存消息状态（用于后续内容更新时编辑消息）；新版本重置 edit_count=0
         if notify_result["message_ids"]:
-            body_hash = compute_body_hash(latest_content)
+            body_hash = compute_body_hash(notification_content)
             if not save_message_state(
                 latest_version, notify_result["message_ids"], body_hash, edit_count=0,
             ):

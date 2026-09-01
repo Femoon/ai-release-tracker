@@ -21,6 +21,7 @@ load_dotenv()
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from core.notify.telegram import send_bilingual_notification
 from core.translate import translate_changelog
+from products.openclaw.content import select_notification_content
 
 # 配置
 CHANGELOG_URL = "https://raw.githubusercontent.com/openclaw/openclaw/refs/heads/main/CHANGELOG.md"
@@ -163,9 +164,10 @@ def main(max_count=3, push_all=False):
     for i, (version, content) in enumerate(pending_versions, 1):
         print(f"\n[{i}/{len(pending_versions)}] 推送版本 {version}...")
 
-        # 翻译内容
+        # 有 Highlights 时只展示 Highlights；否则跳过逐条 Fixes。
+        notification_content = select_notification_content(content)
         print("  正在翻译...")
-        translated = translate_changelog(content)
+        translated = translate_changelog(notification_content)
 
         # 发送通知（带重试）
         result = False
@@ -177,7 +179,7 @@ def main(max_count=3, push_all=False):
             print("  正在发送通知...")
             result = send_bilingual_notification(
                 version=version,
-                original=content,
+                original=notification_content,
                 translated=translated,
                 title="OpenClaw",
                 bot_token=TELEGRAM_BOT_TOKEN,

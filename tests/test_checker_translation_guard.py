@@ -10,6 +10,24 @@ from products.openclaw import checker as openclaw_checker
 
 CHANGELOG = "## 2.1.251\n\n- Added Agent support.\n"
 OPENCLAW_CHANGELOG = "## 2026.3.12\n\n- Added Agent support.\n"
+OPENCLAW_CHANGELOG_WITH_FIXES = """## 2026.8.1
+
+### Highlights
+
+- Added Agent support.
+
+### Changes
+
+- Improved sessions.
+
+### Fixes
+
+- Fixed retries.
+
+### Complete contribution record
+
+- PR #123.
+"""
 
 
 class TranslationGuardTests(unittest.TestCase):
@@ -59,6 +77,41 @@ class TranslationGuardTests(unittest.TestCase):
 
         self.assertEqual(result, 1)
         mock_notify.assert_not_called()
+
+    def test_openclaw_displays_only_highlights_when_present(self):
+        translated = "## 2026.8.1\n\n### 亮点\n\n- 新增 Agent 支持。"
+        with patch.object(
+            openclaw_checker,
+            "fetch_changelog",
+            return_value=OPENCLAW_CHANGELOG_WITH_FIXES,
+        ), patch.object(
+            openclaw_checker, "translate_changelog", return_value=translated
+        ) as mock_translate, patch.object(
+            openclaw_checker, "save_version", return_value=True
+        ), patch.object(
+            openclaw_checker,
+            "send_bilingual_notification",
+            return_value={"success": True, "message_ids": [1]},
+        ) as mock_notify, patch.object(
+            openclaw_checker, "save_message_state", return_value=True
+        ), patch.object(
+            openclaw_checker, "read_saved_version", return_value="2026.7.1"
+        ), patch.object(
+            sys, "argv", ["checker.py"]
+        ):
+            result = openclaw_checker.main()
+
+        self.assertEqual(result, 0)
+        translation_input = mock_translate.call_args.args[0]
+        self.assertIn("### Highlights", translation_input)
+        self.assertNotIn("### Changes", translation_input)
+        self.assertNotIn("### Fixes", translation_input)
+        self.assertNotIn("Complete contribution record", translation_input)
+        self.assertEqual(
+            mock_notify.call_args.kwargs["original"],
+            translation_input,
+        )
+        self.assertEqual(mock_notify.call_args.kwargs["translated"], translated)
 
     def test_claude_code_saves_version_after_successful_translation(self):
         with patch.object(
