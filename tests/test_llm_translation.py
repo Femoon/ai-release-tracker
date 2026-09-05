@@ -2,7 +2,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from core.translate.llm import _normalize_bilingual_summary, translate_changelog
+from core.translate.llm import _normalize_bilingual_summary, _translation_max_tokens, translate_changelog
 from core.translate.policy import protect
 
 
@@ -28,6 +28,18 @@ class TranslateChangelogTests(unittest.TestCase):
         lines = document.protected.splitlines()
         lines[-1] = lines[-1].replace("Added", "新增").replace("support in", "支持，配置位于")
         self.valid_candidate = "\n".join(lines)
+
+    @patch("core.translate.llm.translation_cache.set")
+    @patch("core.translate.llm.translation_cache.get", return_value=None)
+    @patch("core.translate.llm.completion")
+    def test_budget_accounts_for_placeholder_expansion(self, mock_completion, _get, _set):
+        source = "\n".join("- API CLI SDK LLM Agent works." for _ in range(200))
+        document = protect(source)
+        mock_completion.return_value = response(document.protected.replace("works.", "功能正常，可正常使用。"))
+        translate_changelog(source, MODEL, API_KEY)
+        budget = mock_completion.call_args.kwargs["max_tokens"]
+        self.assertEqual(budget, _translation_max_tokens(document.protected))
+        self.assertGreater(budget, _translation_max_tokens(source))
 
     @patch("core.translate.llm.translation_cache.set")
     @patch("core.translate.llm.translation_cache.get", return_value=None)

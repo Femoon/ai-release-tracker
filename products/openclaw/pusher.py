@@ -168,6 +168,9 @@ def main(max_count=3, push_all=False):
         notification_content = select_notification_content(content)
         print("  正在翻译...")
         translated = translate_changelog(notification_content)
+        if notification_content.strip() and not translated:
+            print("翻译失败，保留待推送状态")
+            return 1
 
         # 发送通知（带重试）
         result = False
@@ -212,4 +215,4 @@ if __name__ == "__main__":
     parser.add_argument("--all", action="store_true", help="推送所有未推送版本")
 
     args = parser.parse_args()
-    main(max_count=args.count, push_all=args.all)
+    sys.exit(main(max_count=args.count, push_all=args.all))

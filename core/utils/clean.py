@@ -5,6 +5,37 @@ Release body 清理工具函数
 """
 
 import re
+from markdown_it import MarkdownIt
+
+
+_MARKDOWN = MarkdownIt()
+
+
+def _protect_literals(body: str) -> tuple[str, dict[str, str]]:
+    literals = {}
+    prefix = "RELEASELITERAL"
+    while prefix in body:
+        prefix += "X"
+
+    def save(value):
+        token = f"{prefix}{len(literals)}TOKEN"
+        literals[token] = value
+        return token
+
+    lines = body.splitlines(keepends=True)
+    spans = sorted({tuple(token.map) for token in _MARKDOWN.parse(body)
+                    if token.type in ("fence", "code_block") and token.map}, reverse=True)
+    for start, end in spans:
+        value = "".join(lines[start:end])
+        ending = "\r\n" if value.endswith("\r\n") else "\n" if value.endswith("\n") else ""
+        lines[start:end] = [save(value[:-len(ending)] if ending else value) + ending]
+    protected = "".join(lines)
+    # Match the same backtick run at both ends, including multi-backtick spans.
+    protected = re.sub(r"(?<!`)(`+)(?!`)([\s\S]*?)(?<!`)\1(?!`)",
+                       lambda match: save(match.group(0)), protected)
+    protected = re.sub(r"\[[^\]\n]*\]\([^\s]+\)|https?://[^\s<>]+",
+                       lambda match: save(match.group(0)), protected)
+    return protected, literals
 
 
 def clean_release_body(body: str) -> str:
@@ -31,7 +62,7 @@ def clean_release_body(body: str) -> str:
     if not body:
         return ""
 
-    clean = body
+    clean, literals = _protect_literals(body)
 
     # 移除各种 PR 列表标题及后面所有内容
     pr_title_patterns = [
@@ -86,7 +117,7 @@ def clean_release_body(body: str) -> str:
     clean = re.sub(r'^\*\s+\s+', '* ', clean, flags=re.MULTILINE)
 
     # 将 GitHub @用户名 转换为超链接
-    clean = re.sub(r'@(\w[\w-]*)', r'[@\1](https://github.com/\1)', clean)
+    clean = re.sub(r'(?<![\w/])@(\w[\w-]*)(?![\w/-])', r'[@\1](https://github.com/\1)', clean)
 
     # 清理多余空白和标点
     clean = re.sub(r'\s*:\s*\.?\s*$', '', clean, flags=re.MULTILINE)
@@ -99,7 +130,7 @@ def clean_release_body(body: str) -> str:
     clean = re.sub(r'\n{3,}', '\n\n', clean)
 
     # 清理句末多余的点（如 "sigstore.." → "sigstore."）
-    clean = re.sub(r'\.{2,}', '.', clean)
+    clean = re.sub(r'(?<=[A-Za-z])\.{2,}(?=\s|$)', '.', clean)
 
     # 清理独立的点（单独一行只有点的情况）
     clean = re.sub(r'^\s*\.\s*$', '', clean, flags=re.MULTILINE)
@@ -131,4 +162,7 @@ def clean_release_body(body: str) -> str:
             flags=re.MULTILINE | re.IGNORECASE
         )
 
-    return clean.strip()
+    clean = clean.strip()
+    for token, literal in reversed(literals.items()):
+        clean = clean.replace(token, literal)
+    return clean

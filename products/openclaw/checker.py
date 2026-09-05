@@ -310,8 +310,7 @@ def main():
                     ):
                         print("消息状态保存失败（不影响主流程）")
                 else:
-                    print("消息编辑失败，可能消息已被删除")
-                    clear_message_state()
+                    print("消息编辑失败，保留消息状态以便下次重试")
                     return 1
 
         return 0
@@ -338,11 +337,6 @@ def main():
             print("翻译失败，停止推送；版本状态未更新，下次检查将重新尝试")
             return 1
 
-        if not save_version(latest_version):
-            print("版本记录保存失败，停止推送以避免重复")
-            return 1
-        print("版本信息已更新")
-
         # 发送 Telegram 通知
         notify_result = send_bilingual_notification(
             version=latest_version,
@@ -356,6 +350,10 @@ def main():
         # 检查通知是否发送成功
         if not notify_result["success"]:
             print("Telegram 通知发送失败")
+            return 1
+
+        if not save_version(latest_version):
+            print("通知已发送，但版本记录保存失败")
             return 1
 
         # 保存消息状态（用于后续内容更新时编辑消息）；新版本重置 edit_count=0

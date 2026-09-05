@@ -22,6 +22,7 @@ from core.notify.telegram import send_bilingual_notification, edit_bilingual_not
 from core.notify.telegraph import _strip_changelog_section
 from core.translate import translate_changelog
 from core.utils import clean_release_body
+from core.utils.content import limit_notification_content
 from core.state import (
     compute_body_hash,
     read_message_state as _read_message_state,
@@ -249,6 +250,7 @@ def parse_latest_stable_release(feed_xml):
 
             # 记录找到的稳定版本，但不立即返回（需要检查是否有 API 错误）
             if found_stable is None:
+                content = clean_release_body(release_data.get("body") or "")
                 found_stable = (canonical_tag, title, content, link)
 
             # 找到第一个稳定版本后就停止
@@ -439,6 +441,7 @@ def main():
 
         # 去掉 Changelog 详细列表后再翻译
         original_content = _strip_changelog_section(target_content) if target_content else "（暂无更新说明）"
+        original_content = limit_notification_content(original_content, target_link)
         translated = translate_changelog(original_content) if target_content else ""
         if target_content and original_content.strip() and not translated:
             print("⚠️  翻译失败，停止推送；强制模式未修改本地记录，可直接重跑")
@@ -518,6 +521,7 @@ def main():
 
         # 去掉 Changelog 详细列表后再翻译
         original_content = _strip_changelog_section(latest_content) if latest_content else "（暂无更新说明）"
+        original_content = limit_notification_content(original_content, release_link)
         translated = translate_changelog(original_content) if latest_content else ""
         if latest_content and original_content.strip() and not translated:
             print("⚠️  翻译失败，停止推送；下次检查将重新尝试")
@@ -605,6 +609,7 @@ def main():
 
                 # 去掉 Changelog 详细列表后再翻译
                 original_content = _strip_changelog_section(latest_content) if latest_content else "（暂无更新说明）"
+                original_content = limit_notification_content(original_content, release_link)
                 translated = translate_changelog(original_content) if latest_content else ""
                 if latest_content and original_content.strip() and not translated:
                     print("⚠️  翻译失败，停止编辑；保留现有消息状态以便下次重试")
@@ -631,9 +636,7 @@ def main():
                     ):
                         print("⚠️ 消息状态保存失败（不影响主流程）")
                 else:
-                    print("⚠️  消息编辑失败，可能消息已被删除")
-                    # 清理无效状态，避免下次重复尝试编辑已删除的消息
-                    clear_message_state()
+                    print("消息编辑失败，保留消息状态以便下次重试")
                     return 1
 
         # 如果刚刚解析了旧格式，更新版本文件
@@ -656,6 +659,7 @@ def main():
         print("-" * 50)
         # 去掉 Changelog 详细列表后再翻译
         original_content = _strip_changelog_section(latest_content) if latest_content else "（暂无更新说明）"
+        original_content = limit_notification_content(original_content, release_link)
         translated = translate_changelog(original_content) if latest_content else ""
 
         # 调试：将完整内容（含 Changelog）写入本地文件
@@ -682,11 +686,6 @@ def main():
             print("⚠️  翻译失败，停止推送；版本状态未更新，下次检查将重新尝试")
             return 1
 
-        if not save_version(latest_tag):
-            print("⚠️ 版本记录保存失败，停止推送以避免重复")
-            return 1
-        print("版本信息已更新")
-
         # 发送 Telegram 通知
         notify_result = send_bilingual_notification(
             version=latest_title,  # 使用 title 作为显示版本号（更友好）
@@ -701,6 +700,10 @@ def main():
         # 检查通知是否发送成功
         if not notify_result["success"]:
             print("⚠️  Telegram 通知发送失败")
+            return 1
+
+        if not save_version(latest_tag):
+            print("通知已发送，但版本记录保存失败")
             return 1
 
         # 保存消息状态（用于后续 body 更新时编辑消息）；新版本重置 edit_count=0

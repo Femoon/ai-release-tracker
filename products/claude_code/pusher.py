@@ -20,6 +20,7 @@ load_dotenv()
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from core.notify.telegram import send_bilingual_notification
 from core.translate import translate_changelog
+from core.utils.content import limit_notification_content
 
 # 配置
 CHANGELOG_URL = "https://raw.githubusercontent.com/anthropics/claude-code/refs/heads/main/CHANGELOG.md"
@@ -152,7 +153,11 @@ def main(max_count=3, push_all=False):
 
         # 翻译内容
         print("  正在翻译...")
+        content = limit_notification_content(content, CHANGELOG_URL)
         translated = translate_changelog(content)
+        if content.strip() and not translated:
+            print("翻译失败，保留待推送状态")
+            return 1
 
         # 发送通知（带重试）
         result = False
@@ -197,4 +202,4 @@ if __name__ == "__main__":
     parser.add_argument("--all", action="store_true", help="推送所有未推送版本")
 
     args = parser.parse_args()
-    main(max_count=args.count, push_all=args.all)
+    sys.exit(main(max_count=args.count, push_all=args.all))

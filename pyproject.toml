@@ -8,4 +8,5 @@ dependencies = [
     "requests>=2.28.0",
     "python-dotenv>=1.0.0",
     "litellm>=1.97.0",
+    "markdown-it-py>=3.0.0",
 ]

@@ -3,6 +3,9 @@
 import re
 
 from core.notify.telegraph import _strip_fixes_section
+from core.utils.content import limit_notification_content
+
+SOURCE_URL = "https://github.com/openclaw/openclaw/blob/main/CHANGELOG.md"
 
 
 _VERSION_HEADING_PATTERN = re.compile(r"(?m)^##\s+\d{4}\.\d{1,2}\.\d{1,2}(?:-\d+)?[^\n]*$")
@@ -30,11 +33,11 @@ def select_notification_content(content: str) -> str:
     """Prefer Highlights; otherwise omit Fixes and everything after it."""
     highlights = _HIGHLIGHTS_PATTERN.search(content)
     if not highlights:
-        return _strip_release_metadata(_strip_fixes_section(content))
+        return limit_notification_content(_strip_release_metadata(_strip_fixes_section(content)), SOURCE_URL)
 
     version_heading = _VERSION_HEADING_PATTERN.search(content)
     parts = []
     if version_heading and version_heading.start() < highlights.start():
         parts.append(version_heading.group(0).strip())
     parts.append(highlights.group(0).strip())
-    return _strip_release_metadata("\n\n".join(parts))
+    return limit_notification_content(_strip_release_metadata("\n\n".join(parts)), SOURCE_URL)

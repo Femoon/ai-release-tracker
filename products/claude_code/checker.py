@@ -19,6 +19,7 @@ load_dotenv()
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from core.notify.telegram import edit_bilingual_notification, send_bilingual_notification
 from core.translate import translate_changelog
+from core.utils.content import limit_notification_content
 from core.state import (
     compute_body_hash,
     read_message_state as _read_message_state,
@@ -191,6 +192,7 @@ def main():
         print("-" * 50)
 
         # 发送 Telegram 通知
+        push_content = limit_notification_content(push_content, CHANGELOG_URL)
         translated = translate_changelog(push_content)
         if push_content.strip() and not translated:
             print("⚠️  翻译失败，停止推送；强制模式未修改本地记录，可直接重跑")
@@ -250,7 +252,8 @@ def main():
                 print("-" * 50)
                 print("检测到 CHANGELOG 已更新，正在编辑之前发送的通知...")
 
-                translated = translate_changelog(latest_content)
+                notification_content = limit_notification_content(latest_content, CHANGELOG_URL)
+                translated = translate_changelog(notification_content)
                 if latest_content.strip() and not translated:
                     print("⚠️  翻译失败，停止编辑；保留现有消息状态以便下次重试")
                     return 1
@@ -258,7 +261,7 @@ def main():
                 edit_result = edit_bilingual_notification(
                     message_ids=saved_message_ids,
                     version=latest_version,
-                    original=latest_content,
+                    original=notification_content,
                     translated=translated,
                     title="Claude Code",
                     bot_token=TELEGRAM_BOT_TOKEN,
@@ -273,8 +276,7 @@ def main():
                     ):
                         print("⚠️ 消息状态保存失败（不影响主流程）")
                 else:
-                    print("⚠️  消息编辑失败，可能消息已被删除")
-                    clear_message_state()
+                    print("消息编辑失败，保留消息状态以便下次重试")
                     return 1
 
         return 0
@@ -290,20 +292,16 @@ def main():
         print("-" * 50)
         # 先翻译再落版本号：翻译失败时保持版本状态不变，下次检查会重新尝试，
         # 否则一次翻译失败会让这个版本永久只有英文。
-        translated = translate_changelog(latest_content)
+        notification_content = limit_notification_content(latest_content, CHANGELOG_URL)
+        translated = translate_changelog(notification_content)
         if latest_content.strip() and not translated:
             print("⚠️  翻译失败，停止推送；版本状态未更新，下次检查将重新尝试")
             return 1
 
-        if not save_version(latest_version):
-            print("⚠️ 版本记录保存失败，停止推送以避免重复")
-            return 1
-        print("版本信息已更新")
-
         # 发送 Telegram 通知
         notify_result = send_bilingual_notification(
             version=latest_version,
-            original=latest_content,
+            original=notification_content,
             translated=translated,
             title="Claude Code",
             bot_token=TELEGRAM_BOT_TOKEN,
@@ -313,6 +311,10 @@ def main():
         # 检查通知是否发送成功
         if not notify_result["success"]:
             print("⚠️  Telegram 通知发送失败")
+            return 1
+
+        if not save_version(latest_version):
+            print("通知已发送，但版本记录保存失败")
             return 1
 
         # 保存消息状态（用于后续内容更新时编辑消息）；新版本重置 edit_count=0

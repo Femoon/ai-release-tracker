@@ -283,7 +283,7 @@ def translate_changelog(
         {"role": "system", "content": _TRANSLATION_SYSTEM_PROMPT},
         {"role": "user", "content": f"<SOURCE>\n{document.protected}\n</SOURCE>"},
     ]
-    translation_max_tokens = _translation_max_tokens(content)
+    translation_max_tokens = _translation_max_tokens(document.protected)
     print(f"翻译输出上限: {translation_max_tokens} tokens (reasoning effort: {_reasoning_effort()})")
 
     candidate = ""
