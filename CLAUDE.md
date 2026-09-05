@@ -45,6 +45,16 @@ uv run python products/openclaw/pusher.py --all       # 推送所有未推送版
 
 # 获取 OpenClaw 所有版本信息
 uv run python products/openclaw/fetcher.py
+
+# 单独检查 Hermes Agent 版本更新
+uv run python products/hermes/checker.py
+uv run python products/hermes/checker.py --force  # 强制推送最新版本（不更新记录）
+
+# 批量推送 Hermes Agent 历史版本到 Telegram
+uv run python products/hermes/pusher.py
+uv run python products/hermes/pusher.py --count 5
+uv run python products/hermes/pusher.py --all
+uv run python products/hermes/pusher.py --dry-run --all
 ```
 
 ## 依赖
@@ -80,6 +90,7 @@ uv sync
 | products/claude_code/checker.py | GitHub CHANGELOG.md | output/claude_code_latest_version.txt |
 | products/codex/checker.py | GitHub releases Atom feed | output/codex_latest_version.txt |
 | products/openclaw/checker.py | GitHub CHANGELOG.md | output/openclaw_latest_version.txt |
+| products/hermes/checker.py | GitHub Releases API（Atom 备用） | output/hermes_latest_version.txt |
 
 历史推送脚本 `products/claude_code/pusher.py` 会记录已推送版本到 `output/claude_code_pushed_versions.txt`，避免重复推送。
 
@@ -98,6 +109,7 @@ uv sync
 - Claude Code: https://t.me/claude_code_push
 - OpenAI Codex: https://t.me/codex_push
 - OpenClaw: https://t.me/openclaw_push
+- Hermes Agent: 暂未配置
 
 ```bash
 # Claude Code 通知配置
@@ -111,6 +123,10 @@ export CODEX_CHAT_ID="your_codex_chat_id"
 # OpenClaw 通知配置
 export OPENCLAW_BOT_TOKEN="your_openclaw_bot_token"
 export OPENCLAW_CHAT_ID="your_openclaw_chat_id"
+
+# Hermes Agent 通知配置（频道暂未创建，默认留空）
+export HERMES_BOT_TOKEN=""
+export HERMES_CHAT_ID=""
 ```
 
 未配置时脚本正常运行，仅跳过通知功能。

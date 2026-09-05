@@ -19,6 +19,51 @@ TELEGRAPH_API = "https://api.telegra.ph"
 # 代码占位符：转换期间先把代码内容抽出来，避免内部的 _ < > 被后续规则破坏
 INLINE_CODE_PLACEHOLDER = "\x00CODE{}\x00"
 BLOCK_CODE_PLACEHOLDER = "\x00PRE{}\x00"
+HR_PLACEHOLDER = "\x00HR\x00"
+
+
+def _convert_pipe_tables(text: str) -> str:
+    """Convert simple Markdown tables to readable bullet rows for Telegraph."""
+    lines = text.splitlines()
+    converted = []
+    index = 0
+
+    def cells(line: str) -> list[str]:
+        return [
+            cell.replace(r"\|", "|").strip()
+            for cell in re.split(r"(?<!\\)\|", line.strip().strip("|"))
+        ]
+
+    def is_separator(line: str) -> bool:
+        values = cells(line)
+        return bool(values) and all(re.fullmatch(r":?-{3,}:?", value) for value in values)
+
+    while index < len(lines):
+        if (
+            index + 1 < len(lines)
+            and "|" in lines[index]
+            and is_separator(lines[index + 1])
+        ):
+            headers = cells(lines[index])
+            index += 2
+            rows = []
+            while index < len(lines) and "|" in lines[index] and lines[index].strip():
+                values = cells(lines[index])
+                if len(values) != len(headers):
+                    break
+                pairs = [
+                    f"**{header}:** {value}"
+                    for header, value in zip(headers, values, strict=True)
+                    if header and value
+                ]
+                rows.append("- " + " · ".join(pairs))
+                index += 1
+            converted.extend(rows or [" · ".join(headers)])
+            continue
+        converted.append(lines[index])
+        index += 1
+
+    return "\n".join(converted)
 
 
 def get_token() -> str | None:
@@ -66,10 +111,15 @@ def markdown_to_html(text: str) -> str:
         return INLINE_CODE_PLACEHOLDER.format(len(inline_codes) - 1)
 
     # 处理代码块 ```code``` -> 占位符
-    text = re.sub(r'```[\w]*\n(.*?)\n```', _save_block_code, text, flags=re.DOTALL)
+    text = re.sub(r'```[^`\n]*\n(.*?)\n```', _save_block_code, text, flags=re.DOTALL)
 
     # 处理行内代码 `code` -> 占位符
     text = re.sub(r'`([^`]+)`', _save_inline_code, text)
+
+    text = _convert_pipe_tables(text)
+
+    # Telegraph supports <hr>, but a literal Markdown separator does not.
+    text = re.sub(r'(?m)^\s*(?:---|\*\*\*|___)\s*$', HR_PLACEHOLDER, text)
 
     # 转义普通文本里的 HTML 特殊字符，否则 <id> 之类内容会被当成标签吃掉
     text = html_lib.escape(text, quote=False)
@@ -86,7 +136,7 @@ def markdown_to_html(text: str) -> str:
     # 处理斜体 *text* 或 _text_ -> <i>text</i>
     # 注意：需要避免与粗体冲突，只匹配单个 * 或 _
     text = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'<i>\1</i>', text)
-    text = re.sub(r'(?<!_)_(?!_)(.+?)(?<!_)_(?!_)', r'<i>\1</i>', text)
+    text = re.sub(r'(?<![\w_])_(?!_)(.+?)(?<!_)_(?![\w_])', r'<i>\1</i>', text)
 
     # 处理链接 [text](url) -> <a href="url">text</a>
     text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'<a href="\2">\1</a>', text)
@@ -114,7 +164,11 @@ def markdown_to_html(text: str) -> str:
                 list_items = []
             # 处理普通段落（非空行且不是标签）
             stripped = line.strip()
-            if re.fullmatch(r'\x00PRE\d+\x00', stripped):
+            if stripped == HR_PLACEHOLDER:
+                result_lines.append("<hr>")
+            elif stripped.startswith("&gt; "):
+                result_lines.append(f"<blockquote>{stripped[5:]}</blockquote>")
+            elif re.fullmatch(r'\x00PRE\d+\x00', stripped):
                 # 代码块占位符本身是块级元素，不再包 <p>
                 result_lines.append(stripped)
             elif stripped and not stripped.startswith('<'):
@@ -220,7 +274,11 @@ def html_to_nodes(html: str) -> list:
     nodes = []
 
     # 简单的 HTML 标签解析正则
-    tag_pattern = re.compile(r'<(h3|h4|p|ul|li|pre|code|b|i|a)([^>]*)>(.*?)</\1>|<(hr|br)\s*/?>|([^<]+)', re.DOTALL)
+    tag_pattern = re.compile(
+        r'<(h3|h4|p|ul|li|pre|code|b|i|a|blockquote)([^>]*)>'
+        r'(.*?)</\1>|<(hr|br)\s*/?>|([^<]+)',
+        re.DOTALL,
+    )
 
     for match in tag_pattern.finditer(html):
         if match.group(1):  # 有内容的标签
@@ -284,6 +342,10 @@ PRODUCT_AUTHORS = {
     "OpenClaw": {
         "name": "OpenClaw Changelog",
         "url": "https://t.me/openclaw_push"
+    },
+    "Hermes Agent": {
+        "name": "Hermes Agent Changelog",
+        "url": ""
     }
 }
 
@@ -336,7 +398,9 @@ def publish_changelog(
     title: str,
     original: str,
     translated: str = None,
-    version: str = None
+    version: str = None,
+    source_url: str = None,
+    content_kind: str = "notes",
 ) -> dict:
     """
     发布双语更新日志到 Telegraph
@@ -353,7 +417,8 @@ def publish_changelog(
         dict: {"success": bool, "url": str | None}
     """
     # 构建文章标题
-    page_title = f"{title} {version} Release Notes" if version else f"{title} Release Notes"
+    suffix = "Release Highlights" if content_kind == "highlights" else "Release Notes"
+    page_title = f"{title} {version} {suffix}" if version else f"{title} {suffix}"
 
     # 防御性告警：译文为空时文章只有英文，容易被误认为翻译成功
     if not (translated or "").strip():
@@ -364,11 +429,22 @@ def publish_changelog(
     author_name = author_info.get("name")
     author_url = author_info.get("url")
 
-    def _build_html(orig: str, trans: str = None) -> str:
-        parts = [markdown_to_html(orig)]
+    def _build_html(
+        orig: str,
+        trans: str = None,
+        primary_language: str = "English",
+    ) -> str:
+        parts = [markdown_to_html(f"## {primary_language}\n\n{orig}")]
         if trans:
             parts.append("<hr>")
-            parts.append(markdown_to_html(trans))
+            parts.append(markdown_to_html(f"## 中文\n\n{trans}"))
+        if source_url:
+            parts.append("<hr>")
+            parts.append(
+                markdown_to_html(
+                    f"[View complete GitHub Release | 查看 GitHub 完整日志]({source_url})"
+                )
+            )
         return "\n".join(parts)
 
     # 第一次尝试：完整内容
@@ -407,13 +483,13 @@ def publish_changelog(
 
     cn_url = None
     if trimmed_translated:
-        cn_html = _build_html(trimmed_translated)
+        cn_html = _build_html(trimmed_translated, primary_language="中文")
         cn_result = create_page(f"{page_title} (CN)", cn_html, author_name=author_name, author_url=author_url)
         # 中文也可能过大，截掉 Fixes 后重试
         if not cn_result["success"] and cn_result.get("error") == "CONTENT_TOO_BIG":
             print("单篇中文仍然过大，截掉 Fixes 部分后重试...")
             trimmed_translated = _strip_fixes_section(trimmed_translated)
-            cn_html = _build_html(trimmed_translated)
+            cn_html = _build_html(trimmed_translated, primary_language="中文")
             cn_result = create_page(f"{page_title} (CN)", cn_html, author_name=author_name, author_url=author_url)
         if cn_result["success"]:
             cn_url = cn_result["url"]

@@ -2,7 +2,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from core.translate.llm import translate_changelog
+from core.translate.llm import _normalize_bilingual_summary, translate_changelog
 from core.translate.policy import protect
 
 
@@ -292,6 +292,26 @@ class BuildExtraBodyTests(unittest.TestCase):
         extra_body = mock_completion.call_args.kwargs["extra_body"]
         self.assertEqual(extra_body["provider"], {"only": ["deepseek"]})
         self.assertEqual(extra_body["reasoning"], {"effort": "none"})
+
+
+class SummaryFormattingTests(unittest.TestCase):
+    def test_summary_is_capped_to_six_bilingual_pairs(self):
+        english = [f"• English item {index}" for index in range(10)]
+        chinese = [f"• 中文要点 {index}" for index in range(10)]
+        summary = "\n".join(
+            ["*Key Updates:*", *english, "", "*更新要点：*", *chinese]
+        )
+
+        normalized = _normalize_bilingual_summary(summary)
+
+        self.assertEqual(normalized.count("• "), 12)
+        self.assertNotIn("item 6", normalized)
+        self.assertLessEqual(len(normalized), 1800)
+
+    def test_invalid_unpaired_summary_is_rejected(self):
+        summary = "*Key Updates:*\n• English only"
+
+        self.assertEqual(_normalize_bilingual_summary(summary), "")
 
 
 if __name__ == "__main__":

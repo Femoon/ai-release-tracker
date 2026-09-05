@@ -1,0 +1,188 @@
+{
+  "v2026.3.12": {
+    "content_hash": "0ae263a22b08c00339b2f72aab0321802dc1cfd4638faf3e5660f9aa7dde1f81",
+    "format_version": 3,
+    "message_id": 5,
+    "telegraph_url": null
+  },
+  "v2026.3.17": {
+    "content_hash": "b8e6436ccfce112d7f14627f03882e6b9f481b81368a4067db4f1de805ad73f1",
+    "format_version": 3,
+    "message_id": 8,
+    "telegraph_url": "https://telegra.ph/Hermes-Agent-v030-v2026317-Release-Highlights-09-02"
+  },
+  "v2026.3.23": {
+    "content_hash": "7c5830eb6b16ac8921ae1e766d83728684d14a991eb6725b90c11f19a98bb87d",
+    "format_version": 3,
+    "message_id": 9,
+    "telegraph_url": null
+  },
+  "v2026.3.28": {
+    "content_hash": "4358aa2af32264ce2536149c50c4fc09e0aecb8f54b107b8c962c04eb515a063",
+    "format_version": 3,
+    "message_id": 10,
+    "telegraph_url": null
+  },
+  "v2026.3.30": {
+    "content_hash": "37598574ce3c5866ad5d6703959bc07e5c8d5cbff7b9bce0eb29731901a419bc",
+    "format_version": 3,
+    "message_id": 11,
+    "telegraph_url": "https://telegra.ph/Hermes-Agent-v060-v2026330-Release-Highlights-09-02"
+  },
+  "v2026.4.13": {
+    "content_hash": "7f6038c3cffcf0bd88dfe1078cdf98bb49b6ce626632763b5a7a9e0da0f8bb80",
+    "format_version": 3,
+    "message_id": 14,
+    "telegraph_url": "https://telegra.ph/Hermes-Agent-v090-v2026413-Release-Highlights-09-02"
+  },
+  "v2026.4.16": {
+    "content_hash": "9bd605684327569a9ba0992976db741b1509296acd64837413a162f431f908c2",
+    "format_version": 3,
+    "message_id": 15,
+    "telegraph_url": null
+  },
+  "v2026.4.23": {
+    "content_hash": "8cde5f3565b582a40096773904e3edd30f051e2b63010fbdc501d9b3ea6f3efc",
+    "format_version": 3,
+    "message_id": 16,
+    "telegraph_url": "https://telegra.ph/Hermes-Agent-v0110-v2026423-Release-Highlights-09-02-2"
+  },
+  "v2026.4.3": {
+    "content_hash": "35b79086a8e2798c68db5a4a2d17551530c1b78bc03cba1d7ffea5fec435495e",
+    "format_version": 3,
+    "message_id": 12,
+    "telegraph_url": null
+  },
+  "v2026.4.30": {
+    "content_hash": "5b37bbb0d68d8529dc986d47b8e45b360a1778ed7b60173bdd213c2918b58438",
+    "format_version": 3,
+    "message_id": 17,
+    "telegraph_url": "https://telegra.ph/Hermes-Agent-v0120-v2026430-Release-Highlights-09-02-2"
+  },
+  "v2026.4.8": {
+    "content_hash": "a6b8f2468f308326588a1dc1f9864ebcad9b966599faeb52318b49831e7a9c28",
+    "format_version": 3,
+    "message_id": 13,
+    "telegraph_url": "https://telegra.ph/Hermes-Agent-v080-v202648-Release-Highlights-09-02"
+  },
+  "v2026.5.16": {
+    "content_hash": "a01e835798778785e9d8eafbe08e97912b871582bd8d2b79e763baa1c1fb7211",
+    "format_version": 3,
+    "message_id": 6,
+    "telegraph_url": "https://telegra.ph/Hermes-Agent-v0140-v2026516-Release-Highlights-09-02-2"
+  },
+  "v2026.5.28": {
+    "content_hash": "a04f681539d516692225b646647bbe575b4d5083704df2b09b64578787dba6c1",
+    "format_version": 3,
+    "message_id": 19,
+    "telegraph_url": "https://telegra.ph/Hermes-Agent-v0150-v2026528-Release-Highlights-09-02-2"
+  },
+  "v2026.5.29": {
+    "content_hash": "ffc1ce45c0c8a8788d2d150f61439c936af02f55410598874da49d8fc021006a",
+    "format_version": 3,
+    "message_id": 20,
+    "telegraph_url": "https://telegra.ph/Hermes-Agent-v0151-v2026529-Release-Highlights-09-02"
+  },
+  "v2026.5.29.2": {
+    "content_hash": "c044a7e2a1aa869a02d69ca818aa12378e2bc43a4d9116bf1804af28a686c5f3",
+    "format_version": 3,
+    "message_id": 7,
+    "telegraph_url": null
+  },
+  "v2026.5.7": {
+    "content_hash": "60ed073c17261c2030726f9f221279f907bd099e794a640badfeba76de7a17f2",
+    "format_version": 3,
+    "message_id": 18,
+    "telegraph_url": "https://telegra.ph/Hermes-Agent-v0130-v202657-Release-Highlights-09-02-2"
+  },
+  "v2026.6.19": {
+    "content_hash": "a759fef127e95af84c16e9e9e05eef8755c251cb65e968e1265c181247eed0b7",
+    "format_version": 3,
+    "message_id": 22,
+    "telegraph_url": "https://telegra.ph/Hermes-Agent-v0170-v2026619-Release-Highlights-09-02-2"
+  },
+  "v2026.6.5": {
+    "content_hash": "967e6984a96933fc1c4188665148bd345df7bd71996d7efe69b75e191f5e6829",
+    "format_version": 3,
+    "message_id": 21,
+    "telegraph_url": "https://telegra.ph/Hermes-Agent-v0160-v202665-Release-Highlights-09-02-2"
+  },
+  "v2026.7.1": {
+    "content_hash": "cf5ed5c0994315c0f8aa88bf751bdba8564dec34273d833b477770cb824ca3fa",
+    "format_version": 3,
+    "message_id": 23,
+    "telegraph_url": "https://telegra.ph/Hermes-Agent-v0180-v202671-Release-Highlights-09-02-2"
+  },
+  "v2026.7.20": {
+    "content_hash": "4db3577c9f037f5e3be6d1586fab7fc861e4d8475c6fa8c7568e173e88097547",
+    "format_version": 3,
+    "message_id": 26,
+    "telegraph_url": "https://telegra.ph/Hermes-Agent-v0190-v2026720-Release-Highlights-09-02-2"
+  },
+  "v2026.7.30": {
+    "content_hash": "2b10cbfaa877d0ea54b278822f71eef5893320b7b23648927e2ed1b81ecce8d5",
+    "format_version": 3,
+    "message_id": 27,
+    "telegraph_url": null
+  },
+  "v2026.7.7": {
+    "content_hash": "4b518e601b571252876054f77f85262f059a30ba7a752b13e9547989c414749b",
+    "format_version": 3,
+    "message_id": 24,
+    "telegraph_url": null
+  },
+  "v2026.7.7.2": {
+    "content_hash": "a8c135a771e8be02d441d405dbe0fac67576bf913e48fe324d8f9caaba4da3b5",
+    "format_version": 3,
+    "message_id": 25,
+    "telegraph_url": null
+  },
+  "v2026.8.13": {
+    "content_hash": "63a165cb87e6c830946a659d4d93183da6b6f8d74a21ed159470c05bf783e044",
+    "format_version": 3,
+    "message_id": 29,
+    "telegraph_url": null
+  },
+  "v2026.8.16": {
+    "content_hash": "47a8d69c7e60c61e983ad22efb394e23f4f48a72be181c4bed711bcf76d7a28c",
+    "format_version": 3,
+    "message_id": 30,
+    "telegraph_url": null
+  },
+  "v2026.8.16.2": {
+    "content_hash": "9242a987784d4cf43586135578a6c97f964d9f23f47b2db3767e94627b0cfa85",
+    "format_version": 3,
+    "message_id": 31,
+    "telegraph_url": null
+  },
+  "v2026.8.18": {
+    "content_hash": "f2706a3da0be2252c1074c035a4edaa4e62f3eaa6e19909e8234092d4027ecce",
+    "format_version": 3,
+    "message_id": 32,
+    "telegraph_url": null
+  },
+  "v2026.8.19": {
+    "content_hash": "15945ecceac084314bea34f1cb56ecb47e37075fc38d02bbb39b0c49b2080ec6",
+    "format_version": 3,
+    "message_id": 33,
+    "telegraph_url": null
+  },
+  "v2026.8.27": {
+    "content_hash": "79761acc3581a7641502f2fb902570dd2495819a3d8eed5a3c72a1dd7485797b",
+    "format_version": 3,
+    "message_id": 34,
+    "telegraph_url": null
+  },
+  "v2026.8.3": {
+    "content_hash": "e2a2b97edefa370b0db012daf573efc7ac9d8a918f9700e6a652ba2716c5f5cd",
+    "format_version": 3,
+    "message_id": 28,
+    "telegraph_url": "https://telegra.ph/Hermes-Agent-v0200-v202683-Release-Highlights-09-02"
+  },
+  "v2026.8.31": {
+    "content_hash": "7eb2a98d31a82db8fbe165dd5b165deabcfb39a9f41bb308463c21d14ac039f7",
+    "format_version": 3,
+    "message_id": 35,
+    "telegraph_url": "https://telegra.ph/Hermes-Agent-v0210-v2026831-Release-Highlights-09-02-2"
+  }
+}

@@ -27,7 +27,11 @@ env/
 # 日志
 *.log
 
-# 运行时产物（调试文件）
-output/
+# 运行时产物（调试文件）；Hermes 的 CI 去重状态需要持久化
+output/*
+!output/hermes_latest_version.txt
+!output/hermes_message_state.json
+!output/hermes_push_state.json
+!output/hermes_pushed_versions.txt
 
 .claude/

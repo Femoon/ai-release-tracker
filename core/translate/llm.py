@@ -56,6 +56,8 @@ _REPAIR_MAX_LINES = 12
 # 时只保留前面部分（通常包含 Highlights / Breaking / New Features 等高价值段落），
 # 避免把 70k+ 字符的 changelog 整个塞给 LLM 浪费输入 token
 _SUMMARIZE_INPUT_TRUNCATE_CHARS = 24000
+_SUMMARY_MAX_PAIRS = 6
+_SUMMARY_MAX_CHARS = 1800
 
 _TRANSLATION_SYSTEM_PROMPT = """你是技术软件更新日志翻译器。只输出中文译文，不输出解释。
 
@@ -69,6 +71,39 @@ _TRANSLATION_SYSTEM_PROMPT = """你是技术软件更新日志翻译器。只输
 """
 
 _DEFAULT_REASONING_EFFORT = "none"
+
+
+def _normalize_bilingual_summary(summary: str) -> str:
+    """Enforce paired, bounded summary bullets even when the model ignores its prompt."""
+    english = []
+    chinese = []
+    section = None
+    for raw_line in (summary or "").splitlines():
+        line = raw_line.strip()
+        normalized_header = line.replace("**", "*")
+        if normalized_header == "*Key Updates:*":
+            section = english
+            continue
+        if normalized_header == "*更新要点：*":
+            section = chinese
+            continue
+        if section is not None and (line.startswith("• ") or line.startswith("- ")):
+            section.append(f"• {line[2:].strip()}")
+
+    pair_count = min(len(english), len(chinese), _SUMMARY_MAX_PAIRS)
+    if pair_count == 0:
+        return ""
+
+    def render(count: int) -> str:
+        return "\n".join(
+            ["*Key Updates:*", *english[:count], "", "*更新要点：*", *chinese[:count]]
+        )
+
+    bounded = render(pair_count)
+    while pair_count > 1 and len(bounded) > _SUMMARY_MAX_CHARS:
+        pair_count -= 1
+        bounded = render(pair_count)
+    return bounded if len(bounded) <= _SUMMARY_MAX_CHARS else ""
 
 
 def _reasoning_effort() -> str:
@@ -416,8 +451,11 @@ def summarize_changelog(
 
     cached = translation_cache.get(content, model, kind="summarize")
     if cached:
-        print(f"摘要缓存命中 (跳过 LLM 调用, {len(cached)} 字符)")
-        return cached
+        normalized = _normalize_bilingual_summary(cached)
+        if normalized:
+            print(f"摘要缓存命中 (跳过 LLM 调用, {len(normalized)} 字符)")
+            return normalized
+        print("摘要缓存不符合格式约束，重新生成")
 
     # 超长输入截断：摘要只需要前面的 Highlights/Breaking/New Features 段落
     summarize_input = content
@@ -477,6 +515,10 @@ Only output the summary in the demonstrated format."""
         summary = (choice.message.content or "").strip()
         if not summary:
             print("总结生成失败: API 返回空内容")
+            return ""
+        summary = _normalize_bilingual_summary(summary)
+        if not summary:
+            print("总结生成失败: 输出不符合双语要点格式或长度限制")
             return ""
         print(f"更新要点总结生成完成 ({len(summary)} 字符)")
         # 用原始 content 作为缓存键，避免截断后查不到

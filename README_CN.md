@@ -36,6 +36,7 @@ AI 编码工具版本更新监控工具。自动检查新版本发布，并发�
 | Claude Code | products/claude_code/checker.py | GitHub CHANGELOG.md | [@claude_code_push](https://t.me/claude_code_push) |
 | OpenAI Codex | products/codex/checker.py | GitHub releases Atom feed | [@codex_push](https://t.me/codex_push) |
 | OpenClaw | products/openclaw/checker.py | GitHub CHANGELOG.md | [@openclaw_push](https://t.me/openclaw_push) |
+| Hermes Agent | products/hermes/checker.py | GitHub Releases API（Atom 备用） | 暂未配置 |
 
 ## 快速开始
 
@@ -84,6 +85,15 @@ uv run python products/codex/checker.py
 # 单独检查 OpenClaw（排除 beta 版本）
 uv run python products/openclaw/checker.py
 
+# 单独检查 Hermes Agent
+uv run python products/hermes/checker.py
+
+# 批量推送 Hermes Agent 历史版本（默认推送 3 个未推送版本）
+uv run python products/hermes/pusher.py
+uv run python products/hermes/pusher.py --count 5
+uv run python products/hermes/pusher.py --all
+uv run python products/hermes/pusher.py --dry-run --all
+
 # 批量推送 Claude Code 历史版本到 Telegram
 uv run python products/claude_code/pusher.py              # 推送 3 个版本（默认）
 uv run python products/claude_code/pusher.py --count 5    # 推送 5 个版本
@@ -114,6 +124,8 @@ CODEX_BOT_TOKEN=your_bot_token
 CODEX_CHAT_ID=your_chat_id
 OPENCLAW_BOT_TOKEN=your_bot_token
 OPENCLAW_CHAT_ID=your_chat_id
+HERMES_BOT_TOKEN=
+HERMES_CHAT_ID=
 
 # AI 翻译（可选，未配置时仅发送英文）
 LLM_API_KEY=your_llm_api_key

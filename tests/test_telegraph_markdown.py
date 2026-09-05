@@ -10,8 +10,9 @@ Telegraph Markdown -> HTML -> Node 转换回归测试
 """
 
 import unittest
+from unittest.mock import patch
 
-from core.notify.telegraph import html_to_nodes, markdown_to_html
+from core.notify.telegraph import html_to_nodes, markdown_to_html, publish_changelog
 
 
 def _flatten(nodes) -> str:
@@ -77,6 +78,13 @@ class TelegraphCodeEmphasisTests(unittest.TestCase):
         self.assertEqual("Support **/*.ts globs", _render("- Support `**/*.ts` globs"))
         self.assertIn("<code>**/*.ts</code>", markdown_to_html(markdown))
 
+    def test_plain_identifiers_do_not_create_cross_text_italics(self):
+        markdown = "run_agent.py became faster and session_search is now free"
+        html = markdown_to_html(markdown)
+
+        self.assertNotIn("<i>", html)
+        self.assertEqual(markdown, _render(markdown))
+
 
 class TelegraphEscapeTests(unittest.TestCase):
     """bug 3：尖括号等 HTML 特殊字符必须转义，不能丢内容"""
@@ -102,6 +110,22 @@ class TelegraphEscapeTests(unittest.TestCase):
         self.assertNotIn("<p><pre>", html)
         self.assertEqual("claude attach <id> && echo done", _render(markdown))
 
+    def test_table_like_text_inside_code_block_is_not_converted(self):
+        markdown = "```text\n| A | B |\n| --- | --- |\n| 1 | 2 |\n```"
+
+        html = markdown_to_html(markdown)
+
+        self.assertIn("<pre>| A | B |\n| --- | --- |\n| 1 | 2 |</pre>", html)
+        self.assertNotIn("<ul>", html)
+
+    def test_hyphenated_fence_language_is_recognized(self):
+        markdown = "```objective-c\nvalue_with_underscore();\n```"
+
+        html = markdown_to_html(markdown)
+
+        self.assertIn("<pre>value_with_underscore();</pre>", html)
+        self.assertNotIn("<code>objective-c", html)
+
 
 class TelegraphMarkdownFeatureTests(unittest.TestCase):
     """现有 Markdown 特性不回归"""
@@ -122,6 +146,29 @@ class TelegraphMarkdownFeatureTests(unittest.TestCase):
         html = markdown_to_html("- one\n- two\n\nafter")
         self.assertIn("<ul><li>one</li><li>two</li></ul>", html)
         self.assertIn("<p>after</p>", html)
+
+    def test_blockquote_and_horizontal_rule_are_structural(self):
+        html = markdown_to_html("> A release summary\n\n---\n\nafter")
+        nodes = html_to_nodes(html)
+
+        self.assertIn("<blockquote>A release summary</blockquote>", html)
+        self.assertIn("<hr>", html)
+        self.assertEqual(["blockquote", "hr", "p"], [node["tag"] for node in nodes])
+
+    def test_pipe_table_becomes_readable_list(self):
+        markdown = "| Metric | Value |\n| --- | --- |\n| Commits | 180 |"
+        html = markdown_to_html(markdown)
+
+        self.assertIn("<ul>", html)
+        self.assertIn("<b>Metric:</b> Commits", html)
+        self.assertIn("<b>Value:</b> 180", html)
+
+    def test_pipe_inside_inline_code_stays_in_one_table_cell(self):
+        markdown = "| Setting | Value |\n| --- | --- |\n| Mode | `fast|safe` |"
+
+        html = markdown_to_html(markdown)
+
+        self.assertIn("<b>Value:</b> <code>fast|safe</code>", html)
 
     def test_link_and_query_string(self):
         markdown = "See [docs](https://example.com/a?x=1&y=2) for details"
@@ -147,6 +194,30 @@ class TelegraphMarkdownFeatureTests(unittest.TestCase):
         self.assertIn("Added PreModelSwitch and PostModelSwitch hook events", rendered)
         self.assertIn("Added rate_limits.spend_limit field", rendered)
         self.assertIn("Fixed claude attach <id> crash", rendered)
+
+    @patch("core.notify.telegraph.create_page")
+    def test_publish_labels_languages_and_links_complete_source(self, mock_create):
+        mock_create.return_value = {
+            "success": True,
+            "url": "https://telegra.ph/example",
+            "path": "example",
+            "error": None,
+        }
+
+        publish_changelog(
+            title="Hermes Agent",
+            version="v0.21.0",
+            original="## Highlights\n- Bot Mode",
+            translated="## 亮点\n- Bot 模式",
+            source_url="https://github.com/example/release",
+            content_kind="highlights",
+        )
+
+        page_title, content_html = mock_create.call_args.args[:2]
+        self.assertEqual(page_title, "Hermes Agent v0.21.0 Release Highlights")
+        self.assertIn("<h3>English</h3>", content_html)
+        self.assertIn("<h3>中文</h3>", content_html)
+        self.assertIn("https://github.com/example/release", content_html)
 
 
 def _collect_hrefs(nodes) -> list:

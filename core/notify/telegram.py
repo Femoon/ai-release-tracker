@@ -9,6 +9,14 @@ import re
 import requests
 
 
+def _safe_request_error(error: Exception, bot_token: str = "") -> str:
+    """Render network errors without leaking Telegram credentials in URLs."""
+    message = str(error)
+    if bot_token:
+        message = message.replace(bot_token, "<redacted>")
+    return message
+
+
 def escape_markdown(text: str) -> str:
     """
     转义 Telegram Markdown 特殊字符
@@ -20,17 +28,34 @@ def escape_markdown(text: str) -> str:
         str: 转义后的文本
     """
     # Telegram Markdown 特殊字符: _ * [ ] ( ) ~ ` > # + - = | { } . !
-    # 但我们只转义最常见的问题字符，保留 * 用于粗体
-    escape_chars = r'_`\[\]()~>#+=|{}.!-'
+    escape_chars = r'_*`\[\]()~>#+=|{}.!-'
     return re.sub(f'([{re.escape(escape_chars)}])', r'\\\1', text)
 
 
 def process_message_for_markdown_v2(text: str) -> str:
-    """处理消息，保留粗体标记、超链接和代码块，转义其他特殊字符"""
+    """Render the supported Markdown subset as valid Telegram MarkdownV2."""
+    block_codes = []
+    block_placeholder = "TGPRE{}TOKEN"
+
+    def save_block_code(match):
+        idx = len(block_codes)
+        block_codes.append((match.group(1), match.group(2)))
+        return block_placeholder.format(idx)
+
+    text = re.sub(
+        r'```([A-Za-z0-9_+.-]*)\n(.*?)```',
+        save_block_code,
+        text,
+        flags=re.DOTALL,
+    )
+
+    # Preserve native MarkdownV2 blockquote markers at the start of a line.
+    text = re.sub(r'(?m)^>\s?', 'TGBLOCKQUOTETOKEN', text)
+
     # 先提取并保护超链接 [text](url)
     link_pattern = r'\[([^\]]+)\]\(([^)]+)\)'
     links = []
-    link_placeholder = "\x00LINK{}\x00"
+    link_placeholder = "TGLINK{}TOKEN"
 
     def save_link(match):
         idx = len(links)
@@ -42,7 +67,7 @@ def process_message_for_markdown_v2(text: str) -> str:
     # 提取并保护代码块 `code`
     code_pattern = r'`([^`]+)`'
     codes = []
-    code_placeholder = "\x01CODE{}\x01"
+    code_placeholder = "TGCODE{}TOKEN"
 
     def save_code(match):
         idx = len(codes)
@@ -51,50 +76,75 @@ def process_message_for_markdown_v2(text: str) -> str:
 
     text = re.sub(code_pattern, save_code, text)
 
-    # 处理粗体
-    bold_pattern = r'\*([^*]+)\*'
-    parts = []
-    last_end = 0
+    # Common Markdown uses **bold**, while Telegram MarkdownV2 uses *bold*.
+    text = re.sub(r'\*\*([^*\n]+)\*\*', r'*\1*', text)
+    bolds = []
+    bold_placeholder = "TGBOLD{}TOKEN"
 
-    for match in re.finditer(bold_pattern, text):
-        before_text = text[last_end:match.start()]
-        parts.append(escape_markdown(before_text))
-        bold_content = match.group(1)
-        escaped_bold = escape_markdown(bold_content)
-        parts.append(f'*{escaped_bold}*')
-        last_end = match.end()
+    def save_bold(match):
+        idx = len(bolds)
+        bolds.append(match.group(1))
+        return bold_placeholder.format(idx)
 
-    parts.append(escape_markdown(text[last_end:]))
-    result = ''.join(parts)
+    text = re.sub(r'\*([^*\n]+)\*', save_bold, text)
+    result = escape_markdown(text)
+
+    for idx, bold_content in enumerate(bolds):
+        result = result.replace(
+            bold_placeholder.format(idx),
+            f'*{escape_markdown(bold_content)}*',
+        )
 
     # 恢复超链接
     for idx, (link_text, link_url) in enumerate(links):
         escaped_text = escape_markdown(link_text)
         placeholder = escape_markdown(link_placeholder.format(idx))
-        result = result.replace(placeholder, f'[{escaped_text}]({link_url})')
+        escaped_url = link_url.replace('\\', '\\\\').replace(')', '\\)')
+        result = result.replace(placeholder, f'[{escaped_text}]({escaped_url})')
 
     # 恢复代码块（代码内容需要转义特殊字符，但保留反引号格式）
     for idx, code_content in enumerate(codes):
-        escaped_code = escape_markdown(code_content)
+        escaped_code = code_content.replace('\\', '\\\\').replace('`', '\\`')
         placeholder = escape_markdown(code_placeholder.format(idx))
         result = result.replace(placeholder, f'`{escaped_code}`')
+
+    for idx, (language, code_content) in enumerate(block_codes):
+        escaped_code = code_content.replace('\\', '\\\\').replace('`', '\\`')
+        result = result.replace(
+            block_placeholder.format(idx),
+            f'```{language}\n{escaped_code}```',
+        )
+
+    result = result.replace('TGBLOCKQUOTETOKEN', '>')
 
     return result
 
 
 def clean_for_telegram(text: str, remove_version: bool = False) -> str:
     """清理内容，移除 Telegram 不支持的 Markdown 语法"""
-    # 移除 ## 标题标记
-    text = re.sub(r'^#{1,6}\s*', '', text, flags=re.MULTILINE)
+    blocks = []
+
+    def save_block(match):
+        blocks.append(match.group(0))
+        return f"TGCLEANPRE{len(blocks) - 1}TOKEN"
+
+    text = re.sub(
+        r'```[A-Za-z0-9_+.-]*\n.*?```', save_block, text, flags=re.DOTALL
+    )
+    # Preserve hierarchy after removing unsupported Markdown heading syntax.
+    text = re.sub(r'^#{1,6}\s*(.+)$', r'*\1*', text, flags=re.MULTILINE)
     # 移除版本号行（如单独的 "2.0.56" 行）
     if remove_version:
         text = re.sub(r'^\d+\.\d+\.\d+\s*$', '', text, flags=re.MULTILINE)
-    # 替换列表符号 "- " 为 "• "
-    text = re.sub(r'^- ', '• ', text, flags=re.MULTILINE)
+    text = re.sub(r'^(\s*)[-*]\s+', r'\1• ', text, flags=re.MULTILINE)
+    text = re.sub(r'^\s*(?:---|\*\*\*|___)\s*$', '', text, flags=re.MULTILINE)
 
     # 清理多余空行
     text = re.sub(r'\n{3,}', '\n\n', text)
-    return text.strip()
+    text = text.strip()
+    for idx, block in enumerate(blocks):
+        text = text.replace(f"TGCLEANPRE{idx}TOKEN", block)
+    return text
 
 
 def send_telegram_message(message: str, bot_token: str = None, chat_id: str = None) -> dict:
@@ -141,7 +191,7 @@ def send_telegram_message(message: str, bot_token: str = None, chat_id: str = No
         print(f"Telegram 通知发送成功 (message_id: {message_id})")
         return {"success": True, "message_id": message_id}
     except requests.RequestException as e:
-        print(f"Telegram 通知发送失败: {e}")
+        print(f"Telegram 通知发送失败: {_safe_request_error(e, bot_token)}")
         return {"success": False, "message_id": None}
 
 
@@ -203,7 +253,7 @@ def edit_telegram_message(
         print(f"Telegram 消息编辑成功 (message_id: {edited_message_id})")
         return {"success": True, "message_id": edited_message_id}
     except requests.RequestException as e:
-        print(f"Telegram 消息编辑失败: {e}")
+        print(f"Telegram 消息编辑失败: {_safe_request_error(e, bot_token)}")
         return {"success": False, "message_id": None}
 
 
@@ -216,7 +266,8 @@ def _build_bilingual_messages(
     original: str,
     translated: str,
     title: str,
-    version_url: str = None
+    version_url: str = None,
+    show_language_labels: bool = False,
 ) -> dict:
     """
     构建双语消息内容（内部辅助函数）
@@ -245,18 +296,20 @@ def _build_bilingual_messages(
         cn_title = f"*{title} {version} 发布*"
 
     # 构建英文消息
-    en_lines = [en_title, "", original_en] if title else [original_en]
+    en_content = ["*English*", "", original_en] if show_language_labels else [original_en]
+    en_lines = [en_title, "", *en_content] if title else en_content
     en_message = "\n".join(en_lines)
 
     # 构建中文消息
     cn_content = translated_clean if translated_clean else "（无翻译）"
-    cn_lines = [cn_title, "", cn_content] if title else [cn_content]
+    cn_content_lines = ["*中文*", "", cn_content] if show_language_labels else [cn_content]
+    cn_lines = [cn_title, "", *cn_content_lines] if title else cn_content_lines
     cn_message = "\n".join(cn_lines)
 
     # 构建合并消息
-    combined_lines = [en_title, "", original_en] if title else [original_en]
+    combined_lines = [en_title, "", *en_content] if title else en_content
     if translated_clean:
-        combined_lines.extend(["", translated_clean])
+        combined_lines.extend(["", *cn_content_lines])
     combined_message = "\n".join(combined_lines)
 
     # 检测消息长度
@@ -281,7 +334,9 @@ def send_bilingual_notification(
     title: str,
     bot_token: str = None,
     chat_id: str = None,
-    version_url: str = None
+    version_url: str = None,
+    show_language_labels: bool = False,
+    content_kind: str = "notes",
 ) -> dict:
     """
     发送双语通知，自动处理长度限制
@@ -302,7 +357,14 @@ def send_bilingual_notification(
     Returns:
         dict: {"success": bool, "message_ids": list[int], "telegraph_url": str | None}
     """
-    msgs = _build_bilingual_messages(version, original, translated, title, version_url)
+    msgs = _build_bilingual_messages(
+        version,
+        original,
+        translated,
+        title,
+        version_url,
+        show_language_labels,
+    )
 
     # 消息超长，使用 Telegraph + AI 总结
     if msgs["is_oversized"]:
@@ -316,7 +378,9 @@ def send_bilingual_notification(
             title=title,
             original=original,
             translated=translated,
-            version=version
+            version=version,
+            source_url=version_url,
+            content_kind=content_kind,
         )
 
         if not telegraph_result["success"]:
@@ -329,12 +393,18 @@ def send_bilingual_notification(
         # TG 消息：AI 生成简短总结 + Telegraph 链接
         summary = summarize_changelog(original)
 
-        if cn_url:
+        if cn_url and content_kind == "highlights":
             link_line = (
-                f"\n\n[View Full Changelog]({telegraph_url}) | [查看完整更新日志]({cn_url})"
+                f"\n\n[English highlights]({telegraph_url}) | [中文高光]({cn_url})"
             )
+        elif cn_url:
+            link_line = f"\n\n[English notes]({telegraph_url}) | [中文说明]({cn_url})"
+        elif content_kind == "highlights":
+            link_line = f"\n\n[View bilingual highlights | 查看双语高光]({telegraph_url})"
         else:
-            link_line = f"\n\n[View Full Changelog | 查看完整更新日志]({telegraph_url})"
+            link_line = f"\n\n[View release notes | 查看版本说明]({telegraph_url})"
+        if version_url:
+            link_line += f" | [GitHub]({version_url})"
 
         if summary:
             message = f"{msgs['en_title']}\n\n{summary}{link_line}"
@@ -364,7 +434,9 @@ def edit_bilingual_notification(
     title: str,
     bot_token: str = None,
     chat_id: str = None,
-    version_url: str = None
+    version_url: str = None,
+    show_language_labels: bool = False,
+    content_kind: str = "notes",
 ) -> dict:
     """
     编辑已发送的双语通知
@@ -391,7 +463,14 @@ def edit_bilingual_notification(
         print("没有可编辑的消息 ID")
         return {"success": False, "message_ids": []}
 
-    msgs = _build_bilingual_messages(version, original, translated, title, version_url)
+    msgs = _build_bilingual_messages(
+        version,
+        original,
+        translated,
+        title,
+        version_url,
+        show_language_labels,
+    )
 
     # 消息超长，改用 Telegraph 处理
     if msgs["is_oversized"]:
@@ -404,7 +483,9 @@ def edit_bilingual_notification(
             title=title,
             original=original,
             translated=translated,
-            version=version
+            version=version,
+            source_url=version_url,
+            content_kind=content_kind,
         )
 
         if not telegraph_result["success"]:
@@ -417,12 +498,18 @@ def edit_bilingual_notification(
         # AI 生成简短总结
         summary = summarize_changelog(original)
 
-        if cn_url:
+        if cn_url and content_kind == "highlights":
             link_line = (
-                f"\n\n[View Full Changelog]({telegraph_url}) | [查看完整更新日志]({cn_url})"
+                f"\n\n[English highlights]({telegraph_url}) | [中文高光]({cn_url})"
             )
+        elif cn_url:
+            link_line = f"\n\n[English notes]({telegraph_url}) | [中文说明]({cn_url})"
+        elif content_kind == "highlights":
+            link_line = f"\n\n[View bilingual highlights | 查看双语高光]({telegraph_url})"
         else:
-            link_line = f"\n\n[View Full Changelog | 查看完整更新日志]({telegraph_url})"
+            link_line = f"\n\n[View release notes | 查看版本说明]({telegraph_url})"
+        if version_url:
+            link_line += f" | [GitHub]({version_url})"
 
         if summary:
             short_message = f"{msgs['en_title']}\n\n{summary}{link_line}"
@@ -440,7 +527,8 @@ def edit_bilingual_notification(
         success = all(result["success"] for result in edit_results)
         return {
             "success": success,
-            "message_ids": message_ids if success else []
+            "message_ids": message_ids if success else [],
+            "telegraph_url": telegraph_url if success else None,
         }
 
     # 内容不超长，编辑合并消息
@@ -451,7 +539,8 @@ def edit_bilingual_notification(
         result = edit_telegram_message(message_ids[0], msgs["combined_message"], bot_token, chat_id)
         return {
             "success": result["success"],
-            "message_ids": message_ids if result["success"] else []
+            "message_ids": message_ids if result["success"] else [],
+            "telegraph_url": None,
         }
 
     # 兼容旧的2条消息状态: 第一条编辑为合并内容，第二条编辑为提示
@@ -461,5 +550,6 @@ def edit_bilingual_notification(
 
     return {
         "success": result1["success"] and result2["success"],
-        "message_ids": message_ids
+        "message_ids": message_ids,
+        "telegraph_url": None,
     }

@@ -24,6 +24,10 @@ CHECKERS = [
         "name": "OpenClaw",
         "script": os.path.join(SCRIPT_DIR, "products", "openclaw", "checker.py"),
     },
+    {
+        "name": "Hermes Agent",
+        "script": os.path.join(SCRIPT_DIR, "products", "hermes", "checker.py"),
+    },
 ]
 
 

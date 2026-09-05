@@ -50,6 +50,9 @@ jobs:
           # OpenClaw 通知配置
           OPENCLAW_BOT_TOKEN: ${{ secrets.OPENCLAW_BOT_TOKEN }}
           OPENCLAW_CHAT_ID: ${{ secrets.OPENCLAW_CHAT_ID }}
+          # Hermes Agent 通知配置（频道暂未创建，保持为空）
+          HERMES_BOT_TOKEN: ''
+          HERMES_CHAT_ID: ''
           # AI 翻译配置
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_MODEL: ${{ vars.LLM_MODEL }}

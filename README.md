@@ -36,6 +36,7 @@ A monitoring tool for tracking version updates of AI coding tools. Automatically
 | Claude Code | products/claude_code/checker.py | GitHub CHANGELOG.md | [@claude_code_push](https://t.me/claude_code_push) |
 | OpenAI Codex | products/codex/checker.py | GitHub releases Atom feed | [@codex_push](https://t.me/codex_push) |
 | OpenClaw | products/openclaw/checker.py | GitHub CHANGELOG.md | [@openclaw_push](https://t.me/openclaw_push) |
+| Hermes Agent | products/hermes/checker.py | GitHub Releases API (Atom fallback) | Not configured |
 
 ## Quick Start
 
@@ -84,6 +85,15 @@ uv run python products/codex/checker.py
 # Check OpenClaw only (excludes beta versions)
 uv run python products/openclaw/checker.py
 
+# Check Hermes Agent only
+uv run python products/hermes/checker.py
+
+# Push Hermes Agent historical releases (defaults to 3 pending releases)
+uv run python products/hermes/pusher.py
+uv run python products/hermes/pusher.py --count 5
+uv run python products/hermes/pusher.py --all
+uv run python products/hermes/pusher.py --dry-run --all
+
 # Batch push Claude Code historical versions to Telegram
 uv run python products/claude_code/pusher.py              # Push 3 versions (default)
 uv run python products/claude_code/pusher.py --count 5    # Push 5 versions
@@ -114,6 +124,8 @@ CODEX_BOT_TOKEN=your_bot_token
 CODEX_CHAT_ID=your_chat_id
 OPENCLAW_BOT_TOKEN=your_bot_token
 OPENCLAW_CHAT_ID=your_chat_id
+HERMES_BOT_TOKEN=
+HERMES_CHAT_ID=
 
 # AI Translation (optional, English only if not configured)
 LLM_API_KEY=your_llm_api_key
