@@ -19,6 +19,7 @@ load_dotenv()
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from core.notify.telegram import send_bilingual_notification
 from core.translate import translate_changelog
+from products.codex.releases import is_stable_cli_tag, tag_from_release_url
 from core.utils.content import limit_notification_content
 
 # 配置
@@ -115,17 +116,22 @@ def main(max_count=3, push_all=False):
 
     # 从文件读取版本
     print(f"读取文件: {RELEASES_FILE}")
-    all_releases = parse_releases_file(RELEASES_FILE)
+    all_releases = []
+    for release in parse_releases_file(RELEASES_FILE):
+        if not is_stable_cli_tag(tag_from_release_url(release["url"])):
+            print(f"  [跳过] {release['name']} (非 CLI 稳定版或无法识别的链接)")
+            continue
+        all_releases.append(release)
     print(f"共 {len(all_releases)} 个版本")
 
     # 读取已推送版本
     pushed_versions = read_pushed_versions()
     print(f"已推送 {len(pushed_versions)} 个版本")
 
-    # 过滤未推送版本（排除 beta 版本）
+    # 过滤已经推送的 CLI 稳定版本
     pending_releases = [
         r for r in all_releases
-        if r["name"] not in pushed_versions and "beta" not in r["name"].lower()
+        if r["name"] not in pushed_versions
     ]
     print(f"待推送 {len(pending_releases)} 个版本")
 

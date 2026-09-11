@@ -79,7 +79,7 @@ uv run python main.py
 # Check Claude Code only
 uv run python products/claude_code/checker.py
 
-# Check OpenAI Codex only (excludes alpha versions)
+# Check OpenAI Codex only (only stable Rust CLI releases with rust-vX.Y.Z tags; excludes SDK releases)
 uv run python products/codex/checker.py
 
 # Check OpenClaw only (excludes beta versions)

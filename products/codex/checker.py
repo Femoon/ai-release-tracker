@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 OpenAI Codex 版本更新检查脚本
-从 GitHub releases Atom feed 拉取，检查是否有新的稳定版本发布（排除 alpha 版本）
+从 GitHub releases Atom feed 拉取，检查是否有新的稳定版本发布（仅 rust-vX.Y.Z CLI 稳定版）
 """
 
 import argparse
@@ -21,6 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from core.notify.telegram import send_bilingual_notification, edit_bilingual_notification
 from core.notify.telegraph import _strip_changelog_section
 from core.translate import translate_changelog
+from products.codex.releases import is_stable_cli_tag, is_stable_cli_release, tag_from_release_url
 from core.utils import clean_release_body
 from core.utils.content import limit_notification_content
 from core.state import (
@@ -50,19 +51,6 @@ TELEGRAM_CHAT_ID = os.getenv("CODEX_CHAT_ID", "")
 # Atom 命名空间
 ATOM_NS = {"atom": "http://www.w3.org/2005/Atom"}
 
-# 常见的不稳定版本关键词
-UNSTABLE_KEYWORDS = [
-    "alpha", "beta", "rc", "preview", "pre",
-    "dev", "nightly", "snapshot", "test"
-]
-
-
-def is_unstable_title(title):
-    """快速判断标题是否包含常见的不稳定版本关键词"""
-    title_lower = title.lower()
-    return any(keyword in title_lower for keyword in UNSTABLE_KEYWORDS)
-
-
 def github_headers():
     """构建 GitHub API 请求头"""
     headers = {
@@ -75,12 +63,8 @@ def github_headers():
 
 
 def extract_tag_name(link, fallback_title):
-    """从 release 链接提取 tag 名称，失败时回退到标题"""
-    if link:
-        parts = link.rstrip("/").split("/")
-        if parts:
-            return parts[-1]
-    return fallback_title
+    """从官方 release 链接提取 tag；无法识别时返回空字符串。"""
+    return tag_from_release_url(link) if link else ""
 
 
 def verify_release_via_api(tag_name):
@@ -92,8 +76,11 @@ def verify_release_via_api(tag_name):
         - release_data: API 返回的 release 数据（成功时）或 None
         - status: "stable" | "tag_only" | "draft" | "prerelease" |
                   "rate_limited" | "server_error" | "network_error" |
-                  "json_error" | "api_error_<code>"
+                  "json_error" | "api_error_<code>" | "not_cli_stable"
     """
+    if not is_stable_cli_tag(tag_name):
+        return None, "not_cli_stable"
+
     api_url = GITHUB_RELEASE_BY_TAG_URL.format(tag=tag_name)
 
     try:
@@ -128,6 +115,9 @@ def verify_release_via_api(tag_name):
         return None, "draft"
     if data.get("prerelease", False):
         return None, "prerelease"
+
+    if not is_stable_cli_release(data):
+        return None, "not_cli_stable"
 
     return data, "stable"
 
@@ -197,15 +187,13 @@ def parse_latest_stable_release(feed_xml):
 
         title = title_elem.text.strip()
 
-        # 第一步：快速过滤常见的不稳定版本
-        if is_unstable_title(title):
-            print(f"  [跳过] {title} (包含不稳定关键词)")
-            continue
-
         # 获取链接和 tag 名称（临时，用于 API 查询）
         link_elem = entry.find("atom:link", ATOM_NS)
         link = link_elem.get("href") if link_elem is not None else ""
         tag_name_from_url = extract_tag_name(link, title)
+        if not is_stable_cli_tag(tag_name_from_url):
+            print(f"  [跳过] {title} (非 CLI 稳定版 tag: {tag_name_from_url})")
+            continue
 
         # 获取更新内容
         content_elem = entry.find("atom:content", ATOM_NS)
@@ -342,6 +330,10 @@ def resolve_saved_version_to_tag(saved_version):
         - is_resolved: 是否通过 API 解析（True）或原样返回（False）
         - error: 解析失败的错误信息或 None
     """
+    # 已有明确 tag 保留其身份，尤其不能把 Python SDK 当成 CLI。
+    if "-v" in saved_version:
+        return saved_version, False, None
+
     # 尝试通过 API 查找对应的 tag（包括可能的 tag 格式）
     # 构造可能的 tag 名称（openai/codex 使用 rust-vX.Y.Z 格式）
     possible_tags = [
@@ -364,7 +356,9 @@ def resolve_saved_version_to_tag(saved_version):
 
             if resp.status_code == 200:
                 data = resp.json()
-                canonical_tag = data.get("tag_name", possible_tag)
+                if not is_stable_cli_release(data):
+                    continue
+                canonical_tag = data["tag_name"]
                 # 只有当解析出的 tag 与原值不同时才显示迁移消息
                 if canonical_tag != saved_version:
                     print(f"  [迁移] 解析旧版本 '{saved_version}' → tag '{canonical_tag}'")

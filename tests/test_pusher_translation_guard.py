@@ -15,7 +15,7 @@ class PusherTranslationTests(unittest.TestCase):
                 stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
                 if module is codex:
                     stack.enter_context(patch.object(module, "parse_releases_file", return_value=[
-                        {"name": version, "body": "- Fixed a bug.", "url": "https://example.invalid"}
+                        {"name": version, "body": "- Fixed a bug.", "url": "https://github.com/openai/codex/releases/tag/rust-v1.2.3"}
                     ]))
                 else:
                     stack.enter_context(patch.object(module, "fetch_changelog", return_value=f"## {version}\n- Fixed a bug."))

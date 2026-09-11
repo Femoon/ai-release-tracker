@@ -14,6 +14,7 @@ load_dotenv()
 
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from products.codex.releases import is_stable_cli_release
 from core.utils import clean_release_body
 
 RELEASES_API_URL = "https://api.github.com/repos/openai/codex/releases"
@@ -67,12 +68,6 @@ def version_tuple(version):
     return tuple(result) if len(result) == 3 else None
 
 
-def is_valid_version(name):
-    """检查是否是有效的语义版本号格式（如 0.3.0, 0.64.0）"""
-    # 匹配 X.Y.Z 或 X.Y.Z-beta 等格式
-    return bool(re.match(r'^\d+\.\d+\.\d+(-[\w.]+)?$', name))
-
-
 def main():
     print("拉取 OpenAI Codex Releases")
     print("=" * 50)
@@ -81,21 +76,14 @@ def main():
     all_releases = fetch_all_releases()
     print(f"\n共获取 {len(all_releases)} 个 releases")
 
-    # 过滤有效版本（排除 alpha 和内部构建版本）
+    # 仅保留 CLI 稳定版，排除 SDK、预发布和内部构建
     stable_releases = []
     for release in all_releases:
-        name = release.get("name") or release.get("tag_name", "")
-
-        # 跳过 alpha 版本
-        if "alpha" in name.lower():
+        if not is_stable_cli_release(release):
             continue
-
-        # 只保留有效的语义版本号格式
-        if not is_valid_version(name):
-            continue
-
-        # 过滤 0.3.0 之前的版本
-        vt = version_tuple(name)
+        version = release["tag_name"].removeprefix("rust-v")
+        name = release.get("name") or version
+        vt = version_tuple(version)
         if vt and vt < (0, 3, 0):
             continue
 
@@ -109,7 +97,7 @@ def main():
     # 按发布时间从早到新排序
     stable_releases.sort(key=lambda x: x["published_at"])
 
-    print(f"稳定版本（>=0.3.0，排除 alpha）: {len(stable_releases)} 个")
+    print(f"稳定版本（>=0.3.0，仅 CLI 稳定版）: {len(stable_releases)} 个")
 
     # 输出到文件
     os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
