@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 OpenClaw 历史版本批量推送脚本
-从 GitHub 拉取 CHANGELOG.md，逐个版本推送到 Telegram
+从 GitHub 正式发布记录获取更新日志，逐个版本推送到 Telegram
 """
 
 import argparse
@@ -11,7 +11,6 @@ import os
 import re
 import sys
 import time
-import requests
 
 # 加载 .env 文件
 from dotenv import load_dotenv
@@ -22,9 +21,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from core.notify.telegram import send_bilingual_notification
 from core.translate import translate_changelog
 from products.openclaw.content import select_notification_content
+from products.openclaw.source import fetch_release_changelog, release_url
 
 # 配置
-CHANGELOG_URL = "https://raw.githubusercontent.com/openclaw/openclaw/refs/heads/main/CHANGELOG.md"
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
 PUSHED_VERSIONS_FILE = os.path.join(PROJECT_ROOT, "output", "openclaw_pushed_versions.txt")
@@ -43,14 +42,8 @@ VERSION_PATTERN = r'^## (\d{4}\.\d{1,2}\.\d{1,2}(?:-\d+)?)'
 
 
 def fetch_changelog():
-    """从 GitHub 获取 CHANGELOG.md 内容"""
-    try:
-        response = requests.get(CHANGELOG_URL, timeout=10)
-        response.raise_for_status()
-        return response.text
-    except requests.RequestException as e:
-        print(f"获取更新日志失败: {e}")
-        return None
+    """获取所有已确认正式发布的版本；不读取未发布 changelog。"""
+    return fetch_release_changelog(all_versions=True)
 
 
 def parse_all_versions(changelog_text):
@@ -73,7 +66,7 @@ def parse_all_versions(changelog_text):
                 versions.append((current_version, content))
 
             # 跳过 beta 版本
-            if "beta" in line.lower():
+            if re.search(r"\b(?:beta|alpha|rc|unreleased)\b", line, re.I):
                 current_version = None
                 current_lines = []
                 continue
@@ -185,6 +178,7 @@ def main(max_count=3, push_all=False):
                 original=notification_content,
                 translated=translated,
                 title="OpenClaw",
+                version_url=release_url(version),
                 bot_token=TELEGRAM_BOT_TOKEN,
                 chat_id=TELEGRAM_CHAT_ID
             )

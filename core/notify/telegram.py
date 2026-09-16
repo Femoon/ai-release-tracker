@@ -34,6 +34,7 @@ def escape_markdown(text: str) -> str:
 
 def process_message_for_markdown_v2(text: str) -> str:
     """Render the supported Markdown subset as valid Telegram MarkdownV2."""
+    text = text.replace('\r\n', '\n')
     block_codes = []
     block_placeholder = "TGPRE{}TOKEN"
 
@@ -52,6 +53,17 @@ def process_message_for_markdown_v2(text: str) -> str:
     # Preserve native MarkdownV2 blockquote markers at the start of a line.
     text = re.sub(r'(?m)^>\s?', 'TGBLOCKQUOTETOKEN', text)
 
+    # Code may contain literal Markdown links; protect it before parsing links.
+    codes = []
+    code_placeholder = "TGCODE{}TOKEN"
+
+    def save_code(match):
+        idx = len(codes)
+        codes.append(match.group(1))
+        return code_placeholder.format(idx)
+
+    text = re.sub(r'`([^`\n]+)`', save_code, text)
+
     # 先提取并保护超链接 [text](url)
     link_pattern = r'\[([^\]]+)\]\(([^)]+)\)'
     links = []
@@ -63,18 +75,6 @@ def process_message_for_markdown_v2(text: str) -> str:
         return link_placeholder.format(idx)
 
     text = re.sub(link_pattern, save_link, text)
-
-    # 提取并保护代码块 `code`
-    code_pattern = r'`([^`]+)`'
-    codes = []
-    code_placeholder = "TGCODE{}TOKEN"
-
-    def save_code(match):
-        idx = len(codes)
-        codes.append(match.group(1))
-        return code_placeholder.format(idx)
-
-    text = re.sub(code_pattern, save_code, text)
 
     # Common Markdown uses **bold**, while Telegram MarkdownV2 uses *bold*.
     text = re.sub(r'\*\*([^*\n]+)\*\*', r'*\1*', text)
@@ -97,6 +97,9 @@ def process_message_for_markdown_v2(text: str) -> str:
 
     # 恢复超链接
     for idx, (link_text, link_url) in enumerate(links):
+        # Telegram does not allow a code entity nested inside a link entity.
+        for code_idx, code in enumerate(codes):
+            link_text = link_text.replace(code_placeholder.format(code_idx), code)
         escaped_text = escape_markdown(link_text)
         placeholder = escape_markdown(link_placeholder.format(idx))
         escaped_url = link_url.replace('\\', '\\\\').replace(')', '\\)')
@@ -122,6 +125,7 @@ def process_message_for_markdown_v2(text: str) -> str:
 
 def clean_for_telegram(text: str, remove_version: bool = False) -> str:
     """清理内容，移除 Telegram 不支持的 Markdown 语法"""
+    text = text.replace('\r\n', '\n')
     blocks = []
 
     def save_block(match):
@@ -131,11 +135,20 @@ def clean_for_telegram(text: str, remove_version: bool = False) -> str:
     text = re.sub(
         r'```[A-Za-z0-9_+.-]*\n.*?```', save_block, text, flags=re.DOTALL
     )
-    # Preserve hierarchy after removing unsupported Markdown heading syntax.
-    text = re.sub(r'^#{1,6}\s*(.+)$', r'*\1*', text, flags=re.MULTILINE)
     # 移除版本号行（如单独的 "2.0.56" 行）
     if remove_version:
-        text = re.sub(r'^\d+\.\d+\.\d+\s*$', '', text, flags=re.MULTILINE)
+        text = re.sub(r'(?m)^(?:#{1,6}\s*)?v?\d+\.\d+\.\d+(?:-\d+)?[ \t]*$', '', text)
+    # Protect filename-like prose from Telegram's automatic domain links.
+    text = re.sub(
+        r'(`[^`\n]+`|\[[^\]\n]+\]\([^\n]+?\)|https?://[^\s]+)|\b(AGENTS\.md|CLAUDE\.md)\b',
+        lambda m: m.group(1) or f'`{m.group(2)}`', text,
+    )
+    # Preserve hierarchy after removing unsupported Markdown heading syntax.
+    text = re.sub(
+        r'^#{1,6}[ \t]+(.+)$',
+        lambda m: '*' + re.sub(r'\*\*([^*\n]+)\*\*', r'\1', m.group(1)) + '*',
+        text, flags=re.MULTILINE,
+    )
     text = re.sub(r'^(\s*)[-*]\s+', r'\1• ', text, flags=re.MULTILINE)
     text = re.sub(r'^\s*(?:---|\*\*\*|___)\s*$', '', text, flags=re.MULTILINE)
 
@@ -261,6 +274,35 @@ def edit_telegram_message(
 MAX_MESSAGE_LENGTH = 4096
 
 
+def release_source_url(title: str, version: str) -> str:
+    """Keep a source available even for short, non-Telegraph notifications."""
+    if title == "Claude Code":
+        return "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md#" + version.replace('.', '')
+    if title == "OpenAI Codex":
+        tag = version if version.startswith("rust-v") else "rust-v" + version.removeprefix("v")
+        return "https://github.com/openai/codex/releases/tag/" + tag
+    if title == "OpenClaw":
+        return "https://github.com/openclaw/openclaw/releases/tag/v" + version.removeprefix("v")
+    return ""
+
+
+def _chinese_section_labels(text: str) -> str:
+    labels = {"New Features": "新功能", "新增功能": "新功能", "Bug Fixes": "问题修复",
+              "Bug 修复": "问题修复", "错误修复": "问题修复", "Documentation": "文档",
+              "Chores": "其他更新", "Highlights": "更新亮点"}
+    # Only structural heading lines, never code blocks or words within prose.
+    in_fence = False
+    lines = []
+    for line in text.splitlines():
+        if line.lstrip().startswith("```"):
+            in_fence = not in_fence
+        match = re.fullmatch(r"([#* ]*)(.*?)([* ]*)", line)
+        if not in_fence and match and match.group(2) in labels:
+            line = match.group(1) + labels[match.group(2)] + match.group(3)
+        lines.append(line)
+    return "\n".join(lines)
+
+
 def _build_bilingual_messages(
     version: str,
     original: str,
@@ -282,9 +324,10 @@ def _build_bilingual_messages(
             "cn_title": str         # 中文标题
         }
     """
+    version_url = version_url or release_source_url(title, version)
     # 清理内容
     original_clean = clean_for_telegram(original, remove_version=True)
-    translated_clean = clean_for_telegram(translated, remove_version=True) if translated else ""
+    translated_clean = clean_for_telegram(_chinese_section_labels(translated), remove_version=True) if translated else ""
     original_en = original_clean.replace('链接:', 'Source:')
 
     # 构建标题
@@ -357,6 +400,7 @@ def send_bilingual_notification(
     Returns:
         dict: {"success": bool, "message_ids": list[int], "telegraph_url": str | None}
     """
+    version_url = version_url or release_source_url(title, version)
     msgs = _build_bilingual_messages(
         version,
         original,
@@ -463,6 +507,7 @@ def edit_bilingual_notification(
         print("没有可编辑的消息 ID")
         return {"success": False, "message_ids": []}
 
+    version_url = version_url or release_source_url(title, version)
     msgs = _build_bilingual_messages(
         version,
         original,

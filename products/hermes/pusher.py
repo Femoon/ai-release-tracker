@@ -165,7 +165,7 @@ def deliver_release(release, message_id=None):
             "bot_token": TELEGRAM_BOT_TOKEN,
             "chat_id": TELEGRAM_CHAT_ID,
             "version_url": release["url"],
-            "show_language_labels": True,
+            "show_language_labels": False,
             "content_kind": notification_content_kind(content),
         }
         if message_id is None:

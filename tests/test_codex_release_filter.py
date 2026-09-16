@@ -48,11 +48,62 @@ class CodexReleaseFilterTests(unittest.TestCase):
             self.assertNotEqual(checker.verify_release_via_api('rust-v0.154.0')[1], 'stable')
 
     @patch.object(checker.requests, 'get')
-    def test_sdk_only_feed_has_no_candidate_or_api_request(self, get):
+    def test_sdk_only_feed_uses_releases_api_without_treating_sdk_as_cli(self, get):
+        get.return_value = Mock(status_code=200, json=lambda: [])
         self.assertEqual(checker.parse_latest_stable_release(feed('python-v0.154.0')), (None,) * 5)
-        get.assert_not_called()
+        get.assert_called_once()
+        self.assertEqual(get.call_args.args[0], checker.GITHUB_RELEASES_URL)
+        get.reset_mock()
         self.assertEqual(checker.resolve_saved_version_to_tag('python-v0.154.0'), ('python-v0.154.0', False, None))
         get.assert_not_called()
+
+    @patch.object(checker.requests, 'get')
+    def test_alpha_only_feed_paginates_past_sdk_and_prereleases(self, get):
+        page_one = [release(f'rust-v0.155.0-alpha.{i}') for i in range(100)]
+        page_two = [release('python-v0.155.0'),
+                    {**release('rust-v0.155.0'), 'prerelease': True},
+                    {**release('rust-v0.156.0'), 'draft': True},
+                    release('rust-v0.153.0'), release('rust-v0.154.0')]
+        get.side_effect = [Mock(status_code=200, json=lambda: page_one),
+                           Mock(status_code=200, json=lambda: page_two)]
+        result = checker.parse_latest_stable_release(feed('rust-v0.155.0-alpha.1'))
+        self.assertEqual(result[0], 'rust-v0.154.0')
+        self.assertEqual(result[2], 'CLI notes')
+        self.assertIsNone(result[-1])
+        self.assertEqual([call.kwargs['params']['page'] for call in get.call_args_list], [1, 2])
+
+    @patch.object(checker.requests, 'get')
+    def test_fallback_failures_are_errors_not_empty_success(self, get):
+        for status in (401, 403, 429, 500):
+            with self.subTest(status=status):
+                get.return_value = Mock(status_code=status)
+                result = checker.parse_latest_stable_release(feed('rust-v0.155.0-alpha.1'))
+                self.assertIsNone(result[0])
+                self.assertIn(str(status), result[-1])
+        get.return_value = Mock(status_code=200, json=lambda: {'message': 'not a release list'})
+        self.assertIn('invalid_response', checker.fetch_latest_stable_release_via_api()[-1])
+        get.return_value = Mock(status_code=200)
+        get.return_value.json.side_effect = ValueError('bad json')
+        self.assertIn('json_error', checker.fetch_latest_stable_release_via_api()[-1])
+        get.side_effect = checker.requests.ConnectionError('offline')
+        self.assertIn('network_error', checker.fetch_latest_stable_release_via_api()[-1])
+
+    @patch.object(checker.requests, 'get')
+    def test_second_page_failure_and_pagination_limit_are_not_empty_success(self, get):
+        alphas = [release(f'rust-v0.155.0-alpha.{i}') for i in range(100)]
+        get.side_effect = [Mock(status_code=200, json=lambda: alphas), Mock(status_code=503)]
+        self.assertIn('http_503', checker.fetch_latest_stable_release_via_api()[-1])
+        get.side_effect = None
+        get.return_value = Mock(status_code=200, json=lambda: alphas)
+        with patch.object(checker, 'MAX_RELEASE_PAGES', 1):
+            self.assertIn('pagination_limit_reached', checker.fetch_latest_stable_release_via_api()[-1])
+
+    @patch.object(checker, 'fetch_latest_stable_release_via_api')
+    @patch.object(checker, 'verify_release_via_api', return_value=(None, 'server_error'))
+    def test_candidate_verification_failure_does_not_fall_back_to_older_release(self, verify, fallback):
+        result = checker.parse_latest_stable_release(feed('rust-v0.155.0'))
+        self.assertIn('api_errors', result[-1])
+        fallback.assert_not_called()
 
     def test_fetcher_uses_tag_not_display_title(self):
         with tempfile.TemporaryDirectory() as tmp, patch.object(fetcher, 'OUTPUT_FILE', str(Path(tmp) / 'releases.txt')), patch.object(
@@ -76,29 +127,62 @@ class CodexReleaseFilterTests(unittest.TestCase):
                 send.assert_not_called()
                 save.assert_not_called()
 
-    def test_python_state_is_replaced_only_after_successful_cli_notification(self):
-        for success in (False, True):
-            with self.subTest(success=success), tempfile.TemporaryDirectory() as tmp, contextlib.ExitStack() as stack:
+    def test_non_cli_state_never_causes_automatic_cli_repost(self):
+        for saved_tag in ('python-v0.154.0', 'python-v0.153.0', 'js-v0.154.0', 'rust-v0.154.0-alpha.1'):
+            with self.subTest(saved_tag=saved_tag), tempfile.TemporaryDirectory() as tmp, contextlib.ExitStack() as stack:
                 Path(tmp, 'output').mkdir()
                 for name, value in [('PROJECT_ROOT', tmp)]:
                     stack.enter_context(patch.object(checker, name, value))
                 stack.enter_context(patch('sys.argv', ['checker.py']))
                 stack.enter_context(patch.object(checker, 'fetch_releases_feed', return_value=('feed', None)))
                 stack.enter_context(patch.object(checker, 'parse_latest_stable_release', return_value=('rust-v0.154.0', '0.154.0', 'CLI notes', release('rust-v0.154.0')['html_url'], None)))
-                stack.enter_context(patch.object(checker, 'read_saved_version', return_value='python-v0.154.0'))
-                stack.enter_context(patch.object(checker, 'translate_changelog', return_value='CLI 更新'))
-                stack.enter_context(patch.object(checker, 'send_bilingual_notification', return_value={'success': success, 'message_ids': [261] if success else []}))
+                stack.enter_context(patch.object(checker, 'read_saved_version', return_value=saved_tag))
+                translate = stack.enter_context(patch.object(checker, 'translate_changelog'))
+                send = stack.enter_context(patch.object(checker, 'send_bilingual_notification'))
                 edit = stack.enter_context(patch.object(checker, 'edit_bilingual_notification'))
                 save = stack.enter_context(patch.object(checker, 'save_version', return_value=True))
                 state = stack.enter_context(patch.object(checker, 'save_message_state', return_value=True))
-                self.assertEqual(checker.main(), 0 if success else 1)
+                self.assertEqual(checker.main(), 1)
+                translate.assert_not_called()
+                send.assert_not_called()
                 edit.assert_not_called()
-                if success:
-                    save.assert_called_once_with('rust-v0.154.0')
-                    self.assertEqual(state.call_args.args[0], 'rust-v0.154.0')
-                else:
-                    save.assert_not_called()
-                    state.assert_not_called()
+                save.assert_not_called()
+                state.assert_not_called()
+
+    @patch.object(checker.requests, 'get')
+    def test_bare_semver_still_migrates_after_api_confirms_cli_identity(self, get):
+        get.side_effect = [Mock(status_code=404),
+                           Mock(status_code=200, json=lambda: release('rust-v0.154.0'))]
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(patch('sys.argv', ['checker.py']))
+            stack.enter_context(patch.object(checker, 'fetch_releases_feed', return_value=('feed', None)))
+            stack.enter_context(patch.object(checker, 'parse_latest_stable_release', return_value=(
+                'rust-v0.154.0', '0.154.0', 'CLI notes', release('rust-v0.154.0')['html_url'], None)))
+            stack.enter_context(patch.object(checker, 'read_saved_version', return_value='0.154.0'))
+            stack.enter_context(patch.object(checker, 'read_message_state', return_value=None))
+            send = stack.enter_context(patch.object(checker, 'send_bilingual_notification'))
+            edit = stack.enter_context(patch.object(checker, 'edit_bilingual_notification'))
+            save = stack.enter_context(patch.object(checker, 'save_version', return_value=True))
+            self.assertEqual(checker.main(), 0)
+            send.assert_not_called()
+            edit.assert_not_called()
+            save.assert_called_once_with('rust-v0.154.0')
+
+    @patch.object(checker.requests, 'get', side_effect=checker.requests.ConnectionError('offline'))
+    def test_unverifiable_legacy_semver_fails_closed_without_notification(self, _get):
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(patch('sys.argv', ['checker.py']))
+            stack.enter_context(patch.object(checker, 'fetch_releases_feed', return_value=('feed', None)))
+            stack.enter_context(patch.object(checker, 'parse_latest_stable_release', return_value=(
+                'rust-v0.154.0', '0.154.0', 'CLI notes', release('rust-v0.154.0')['html_url'], None)))
+            stack.enter_context(patch.object(checker, 'read_saved_version', return_value='0.154.0'))
+            send = stack.enter_context(patch.object(checker, 'send_bilingual_notification'))
+            translate = stack.enter_context(patch.object(checker, 'translate_changelog'))
+            save = stack.enter_context(patch.object(checker, 'save_version'))
+            self.assertEqual(checker.main(), 1)
+            send.assert_not_called()
+            translate.assert_not_called()
+            save.assert_not_called()
 
 
 if __name__ == '__main__':

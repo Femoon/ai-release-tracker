@@ -10,6 +10,7 @@ import html as html_lib
 import json
 import os
 import re
+from html.parser import HTMLParser
 
 import requests
 
@@ -114,7 +115,8 @@ def markdown_to_html(text: str) -> str:
     text = re.sub(r'```[^`\n]*\n(.*?)\n```', _save_block_code, text, flags=re.DOTALL)
 
     # 处理行内代码 `code` -> 占位符
-    text = re.sub(r'`([^`]+)`', _save_inline_code, text)
+    # A stray backtick in one changelog item must not consume later list items.
+    text = re.sub(r'`([^`\n]+)`', _save_inline_code, text)
 
     text = _convert_pipe_tables(text)
 
@@ -230,7 +232,7 @@ def create_page(
     data = {
         "access_token": token,
         "title": title,
-        "content": json.dumps(content),
+        "content": json.dumps(content, ensure_ascii=False),
         "author_name": author_name,
         "return_content": False,
     }
@@ -259,11 +261,69 @@ def create_page(
         return {"success": False, "url": None, "path": None, "error": str(e)}
 
 
+def get_page(path: str, access_token: str | None = None) -> dict:
+    """Read a page, including its content and editability when a token is supplied."""
+    params = {"path": path, "return_content": True}
+    if access_token:
+        params["access_token"] = access_token
+    try:
+        response = requests.get(f"{TELEGRAPH_API}/getPage", params=params, timeout=30)
+        response.raise_for_status()
+        result = response.json()
+        if result.get("ok"):
+            return {"success": True, "page": result["result"], "error": None}
+        return {"success": False, "page": None, "error": result.get("error", "UNKNOWN_ERROR")}
+    except (requests.RequestException, ValueError):
+        # Requests exception URLs may contain access_token query parameters.
+        return {"success": False, "page": None, "error": "Telegraph page read failed"}
+
+
+def edit_page(
+    path: str,
+    title: str,
+    content_html: str,
+    access_token: str | None = None,
+    author_name: str | None = None,
+    author_url: str | None = None,
+) -> dict:
+    """Update an owned page in place; never fall back to creating a new URL."""
+    token = access_token or get_token()
+    if not token:
+        return {"success": False, "url": None, "path": path, "error": "TOKEN_REQUIRED"}
+    data = {
+        "access_token": token,
+        "path": path,
+        "title": title,
+        "content": json.dumps(html_to_nodes(content_html), ensure_ascii=False),
+        "return_content": True,
+    }
+    if author_name is not None:
+        data["author_name"] = author_name
+    if author_url is not None:
+        data["author_url"] = author_url
+    try:
+        response = requests.post(f"{TELEGRAPH_API}/editPage", data=data, timeout=30)
+        response.raise_for_status()
+        result = response.json()
+        if result.get("ok"):
+            page = result["result"]
+            return {
+                "success": True, "url": page["url"], "path": page["path"],
+                "page": page, "error": None,
+            }
+        return {
+            "success": False, "url": None, "path": path,
+            "error": result.get("error", "UNKNOWN_ERROR"),
+        }
+    except (requests.RequestException, ValueError):
+        return {"success": False, "url": None, "path": path, "error": "Telegraph page edit failed"}
+
+
 def html_to_nodes(html: str) -> list:
     """
     将 HTML 字符串转换为 Telegraph Node 格式
 
-    简化实现：按标签拆分，转换为 Node 数组
+    使用 HTML 解析器保留嵌套结构，避免 b / blockquote 等标签前缀冲突。
 
     Args:
         html: HTML 格式字符串
@@ -271,62 +331,56 @@ def html_to_nodes(html: str) -> list:
     Returns:
         list: Telegraph Node 数组
     """
-    nodes = []
+    class NodeParser(HTMLParser):
+        allowed = {
+            "a", "aside", "b", "blockquote", "br", "code", "em", "figcaption",
+            "figure", "h3", "h4", "hr", "i", "iframe", "img", "li", "ol", "p",
+            "pre", "s", "strong", "u", "ul", "video",
+        }
+        void = {"hr", "br", "img"}
 
-    # 简单的 HTML 标签解析正则
-    tag_pattern = re.compile(
-        r'<(h3|h4|p|ul|li|pre|code|b|i|a|blockquote)([^>]*)>'
-        r'(.*?)</\1>|<(hr|br)\s*/?>|([^<]+)',
-        re.DOTALL,
-    )
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.nodes = []
+            self.stack = []
 
-    for match in tag_pattern.finditer(html):
-        if match.group(1):  # 有内容的标签
-            tag = match.group(1)
-            attrs_str = match.group(2)
-            inner = match.group(3)
+        def append(self, node):
+            children = self.stack[-1]["children"] if self.stack else self.nodes
+            children.append(node)
 
+        def handle_starttag(self, tag, attrs):
+            if tag not in self.allowed:
+                return
             node = {"tag": tag}
+            permitted_attrs = {
+                key: value for key, value in attrs
+                if key in {"href", "src"} and value is not None
+            }
+            if permitted_attrs:
+                node["attrs"] = permitted_attrs
+            if tag not in self.void:
+                node["children"] = []
+            self.append(node)
+            if tag not in self.void:
+                self.stack.append(node)
 
-            # 解析属性（主要是 href）
-            if attrs_str:
-                href_match = re.search(r'href=["\']([^"\']+)["\']', attrs_str)
-                if href_match:
-                    node["attrs"] = {"href": html_lib.unescape(href_match.group(1))}
+        def handle_endtag(self, tag):
+            for index in range(len(self.stack) - 1, -1, -1):
+                if self.stack[index]["tag"] == tag:
+                    del self.stack[index:]
+                    break
 
-            # 递归处理子内容
-            if tag == "ul":
-                # 列表项需要特殊处理
-                li_pattern = re.compile(r'<li>(.*?)</li>', re.DOTALL)
-                children = []
-                for li_match in li_pattern.finditer(inner):
-                    li_content = li_match.group(1)
-                    # 如果内容包含 HTML 标签，递归处理；否则直接使用文本
-                    if "<" in li_content:
-                        li_children = html_to_nodes(li_content)
-                    else:
-                        li_children = [html_lib.unescape(li_content)] if li_content else []
-                    children.append({"tag": "li", "children": li_children})
-                node["children"] = children
-            elif "<" in inner:
-                # 内部还有标签，递归处理
-                node["children"] = html_to_nodes(inner)
-            else:
-                # 纯文本（Node 里的文本是明文，需要把 HTML 实体还原回来）
-                node["children"] = [html_lib.unescape(inner)] if inner else []
+        def handle_data(self, data):
+            # 行内元素之间的空格以及 pre 中的空行必须保留。
+            if data.strip() or (
+                self.stack and self.stack[-1]["tag"] not in {"ul", "ol"}
+            ):
+                self.append(data)
 
-            nodes.append(node)
-        elif match.group(4):  # 自闭合标签 (hr, br)
-            tag = match.group(4)
-            nodes.append({"tag": tag})
-        elif match.group(5):  # 纯文本
-            text = match.group(5)
-            # 纯空白片段是块级标签之间的换行，直接丢弃；
-            # 其余文本保留首尾空格，否则行内 <code> 两侧的空格会被吞掉
-            if text.strip():
-                nodes.append(html_lib.unescape(text))
-
-    return nodes
+    parser = NodeParser()
+    parser.feed(html)
+    parser.close()
+    return parser.nodes
 
 
 # 产品作者信息映射

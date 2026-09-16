@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 
 KEEP_TERMS = (
+    "opencode-free",
     "Model Context Protocol",
     "Background Task",
     "Thinking Block",
@@ -64,6 +65,18 @@ TERMINOLOGY_INSTRUCTION = (
     "专业术语规则：CLI 专业术语（包括大小写和复数变体）必须保留英文；"
     "不确定的产品功能名保留英文。"
 )
+
+# Context-sensitive guidance, not global replacements: e.g. Docker images really
+# are 镜像, while images in a conversation are 图片.
+SEMANTIC_INSTRUCTION = """语义约束：
+- 保留产品名、provider ID、命令、配置键和代码标识（尤其 opencode-free），不得按普通词拆译。
+- 在权限交互中 prompt again 指再次询问/提示用户，不是再次运行命令；保留是否重复授权的条件。
+- images 在视觉输入、上下文或聊天附件中指图片；仅容器/部署 images 指镜像。
+- model resolution 指模型解析/选择，不是分辨率；missed-fire surfacing 指提示错过的定时执行。
+- password-blind 指对智能体隐藏密码，不是免密码登录；不得丢掉秘密不可见这一条件。
+- 保留主体、否定、默认/可选状态、版本和平台限制；分别描述权限继承、凭据发错主机、跨配置敏感附件泄露，不得合并为同一种故障。
+- 如果需要升级、迁移或恢复，保留适用条件和必要操作；不要把已修复问题推断成已有数据自动恢复。
+"""
 
 
 @dataclass(frozen=True)
@@ -149,6 +162,13 @@ def protect(content: str) -> ProtectedDocument:
         parts.append(before)
         line_index += before.count("\n")
         source = match.group(0)
+        if source.lower() == "prompt" and re.match(
+            r"\s+again\b", content[match.end():], re.IGNORECASE
+        ):
+            # Here prompt is a verb (ask the user), not the CLI noun Prompt.
+            parts.append(source)
+            cursor = match.end()
+            continue
         if source.lower() in {"agent", "agents"} and re.search(
             r"\b(?:proxy|user)\s+$", content[max(0, match.start() - 12) : match.start()], re.I
         ):

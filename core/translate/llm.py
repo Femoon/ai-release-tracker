@@ -11,6 +11,7 @@ from litellm import completion
 
 from core.translate import cache as translation_cache
 from core.translate.policy import (
+    SEMANTIC_INSTRUCTION,
     TERMINOLOGY_INSTRUCTION,
     apply_repair,
     degraded_tolerance,
@@ -48,7 +49,8 @@ _FATAL_ERROR_KEYWORDS = (
 _TRANSLATE_MIN_TOKENS = 8192
 _TRANSLATE_MAX_TOKENS = 32768
 _SUMMARIZE_MAX_TOKENS = 4096
-_TRANSLATION_CACHE_KIND = "translate_guarded_v1"
+_TRANSLATION_CACHE_KIND = "translate_guarded_v2"
+_SUMMARY_CACHE_KIND = "summarize_guarded_v3"
 # 定向修复最多处理的失败行数：超过说明整份译文的 placeholder 大面积错乱，
 # 重新翻译比逐行修复更划算也更可靠
 _REPAIR_MAX_LINES = 12
@@ -68,7 +70,7 @@ _TRANSLATION_SYSTEM_PROMPT = """你是技术软件更新日志翻译器。只输
 - 不要添加原文没有的标题、前言、结尾或说明
 - commit 前缀 fix/feat/chore 等保留英文
 - 中文表达自然、准确，符合技术文档习惯
-"""
+""" + SEMANTIC_INSTRUCTION
 
 _DEFAULT_REASONING_EFFORT = "none"
 
@@ -90,9 +92,18 @@ def _normalize_bilingual_summary(summary: str) -> str:
         if section is not None and (line.startswith("• ") or line.startswith("- ")):
             section.append(f"• {line[2:].strip()}")
 
-    pair_count = min(len(english), len(chinese), _SUMMARY_MAX_PAIRS)
+    if len(english) != len(chinese):
+        return ""
+    pair_count = min(len(english), _SUMMARY_MAX_PAIRS)
     if pair_count == 0:
         return ""
+
+    # A summary can omit entire features, but the paired translation must keep
+    # the identifiers present in its English bullet (with or without backticks).
+    for source, translated in zip(english[:pair_count], chinese[:pair_count]):
+        identifiers = re.findall(r"`([^`]+)`|\b(opencode-free)\b", source)
+        if any((code or provider) not in translated for code, provider in identifiers):
+            return ""
 
     def render(count: int) -> str:
         return "\n".join(
@@ -104,6 +115,14 @@ def _normalize_bilingual_summary(summary: str) -> str:
         pair_count -= 1
         bounded = render(pair_count)
     return bounded if len(bounded) <= _SUMMARY_MAX_CHARS else ""
+
+
+def _has_unsupported_breaking_label(summary: str, source: str) -> bool:
+    """Do not promote an ordinary fix to an upstream breaking-change claim."""
+    return bool(
+        re.search(r"\bbreaking(?:\s+changes?)?\s*:", summary, re.IGNORECASE)
+        and not re.search(r"\bbreaking(?:\s+changes?)?\b", source, re.IGNORECASE)
+    )
 
 
 def _reasoning_effort() -> str:
@@ -449,10 +468,10 @@ def summarize_changelog(
         print("翻译配置未设置，跳过总结生成")
         return ""
 
-    cached = translation_cache.get(content, model, kind="summarize")
+    cached = translation_cache.get(content, model, kind=_SUMMARY_CACHE_KIND)
     if cached:
         normalized = _normalize_bilingual_summary(cached)
-        if normalized:
+        if normalized and not _has_unsupported_breaking_label(normalized, content):
             print(f"摘要缓存命中 (跳过 LLM 调用, {len(normalized)} 字符)")
             return normalized
         print("摘要缓存不符合格式约束，重新生成")
@@ -466,7 +485,7 @@ def summarize_changelog(
         )
         summarize_input = summarize_input[:_SUMMARIZE_INPUT_TRUNCATE_CHARS]
 
-    summary_system = f"""Please extract 3-8 important updates from release notes and produce a concise bilingual summary.
+    summary_system = f"""Please extract up to 6 important updates from release notes and produce a concise bilingual summary. Do not pad a short release to reach a minimum count.
 
 Requirements:
 - Output format: English bullet points first, then a blank line, then Chinese bullet points
@@ -476,8 +495,13 @@ Requirements:
 - Focus on user-facing changes: new features, important bug fixes, breaking changes
 - Skip minor internal changes, dependency bumps, and trivial fixes
 - Keep each point to one line, concise and clear
+- English and Chinese bullets must match one-to-one, with the same claims, conditions and identifiers
+- Prioritize required upgrade, migration and recovery actions ahead of optional features; preserve their applicability conditions and commands
+- Put required recovery/upgrade actions first. Do not label a change "Breaking" or "破坏性变更" unless the source explicitly classifies it as a breaking change; a changed default or fixed isolation bug alone is not such a classification
+- Do not broaden source claims or combine distinct security failures into a different failure mode
 
 {TERMINOLOGY_INSTRUCTION}
+{SEMANTIC_INSTRUCTION}
 
 Example output format:
 *Key Updates:*
@@ -517,12 +541,12 @@ Only output the summary in the demonstrated format."""
             print("总结生成失败: API 返回空内容")
             return ""
         summary = _normalize_bilingual_summary(summary)
-        if not summary:
+        if not summary or _has_unsupported_breaking_label(summary, content):
             print("总结生成失败: 输出不符合双语要点格式或长度限制")
             return ""
         print(f"更新要点总结生成完成 ({len(summary)} 字符)")
         # 用原始 content 作为缓存键，避免截断后查不到
-        translation_cache.set(content, model, summary, kind="summarize")
+        translation_cache.set(content, model, summary, kind=_SUMMARY_CACHE_KIND)
         return summary
     except Exception as e:
         print(f"总结生成失败: {e}")

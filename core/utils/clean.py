@@ -76,8 +76,12 @@ def clean_release_body(body: str) -> str:
     for pattern in pr_title_patterns:
         clean = re.sub(pattern, '', clean, flags=re.DOTALL | re.IGNORECASE)
 
-    # 移除 Full Changelog 行
-    clean = re.sub(r'\*?\*?Full Changelog\*?\*?:?.*', '', clean, flags=re.IGNORECASE)
+    # A compare-only release has no prose: its comparison is the only useful
+    # content, so retain it instead of publishing an empty Changelog heading.
+    compare_lines = re.findall(r'^.*Full Changelog.*$', clean, flags=re.MULTILINE | re.IGNORECASE)
+    without_compare = re.sub(r'^.*Full Changelog.*$', '', clean, flags=re.MULTILINE | re.IGNORECASE)
+    substantive = re.sub(r'(?m)^\s*#{1,6}[^\n]*$', '', without_compare).strip()
+    clean = without_compare if substantive else without_compare + '\n' + '\n'.join(compare_lines)
 
     # 移除 PR 列表行（各种格式）
     clean = re.sub(r'^[-*]\s+.*(?:by @|— @).*(?:in #\d+|#\d+).*$', '', clean, flags=re.MULTILINE)
@@ -162,6 +166,8 @@ def clean_release_body(body: str) -> str:
             flags=re.MULTILINE | re.IGNORECASE
         )
 
+    # Drop empty section headings left behind after removing reference lists.
+    clean = re.sub(r'(?m)^#{1,6}[^\n]+\n(?=\s*(?:#{1,6}\s|\Z))', '', clean)
     clean = clean.strip()
     for token, literal in reversed(literals.items()):
         clean = clean.replace(token, literal)

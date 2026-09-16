@@ -6,6 +6,15 @@ from products.codex import checker
 
 
 class ReleaseCleanTests(unittest.TestCase):
+    def test_compare_only_release_keeps_its_only_meaningful_content(self):
+        source = "## Changelog\n\n**Full Changelog**: https://github.com/openai/codex/compare/rust-v0.149.0...rust-v0.149.1"
+        self.assertIn("https://github.com/openai/codex/compare/", clean_release_body(source))
+
+    def test_empty_trailing_changelog_heading_is_removed(self):
+        result = clean_release_body("## Fixes\n\n- Fixed crash.\n\n## Changelog\n\n**Full Changelog**: https://example.test/compare")
+        self.assertNotIn("## Changelog", result)
+        self.assertIn("Fixed crash.", result)
+
     def test_inline_code_is_preserved_exactly(self):
         for code in ("`../config`", "`npm install @openai/codex`", "`#123456`",
                      "``a `nested` value``", "`foo(...args)`"):

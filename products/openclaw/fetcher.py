@@ -2,19 +2,20 @@
 # -*- coding: utf-8 -*-
 """
 拉取 OpenClaw 所有版本日志并保存到文件
-从 CHANGELOG.md 解析所有版本信息
+从 GitHub 正式发布记录及对应更新日志解析版本信息
 """
 
 import os
 import re
 import sys
-import requests
 from dotenv import load_dotenv
 
 load_dotenv()
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from products.openclaw.source import fetch_release_changelog
+
 # 配置
-CHANGELOG_URL = "https://raw.githubusercontent.com/openclaw/openclaw/refs/heads/main/CHANGELOG.md"
 GITHUB_RELEASE_URL_BASE = "https://github.com/openclaw/openclaw/releases/tag"
 
 # 获取项目根目录
@@ -27,14 +28,8 @@ VERSION_PATTERN = r'^## (\d{4}\.\d{1,2}\.\d{1,2}(?:-\d+)?)'
 
 
 def fetch_changelog():
-    """从 GitHub 获取 CHANGELOG.md 内容"""
-    try:
-        response = requests.get(CHANGELOG_URL, timeout=10)
-        response.raise_for_status()
-        return response.text
-    except requests.RequestException as e:
-        print(f"获取更新日志失败: {e}")
-        return None
+    """获取所有 GitHub 正式发布记录，包括拆分 changelog 后的版本。"""
+    return fetch_release_changelog(all_versions=True)
 
 
 def parse_all_versions(changelog_text):
@@ -57,7 +52,7 @@ def parse_all_versions(changelog_text):
                 versions.append((current_version, content))
 
             # 跳过 beta 版本
-            if "beta" in line.lower():
+            if re.search(r"\b(?:beta|alpha|rc|unreleased)\b", line, re.I):
                 current_version = None
                 current_lines = []
                 continue

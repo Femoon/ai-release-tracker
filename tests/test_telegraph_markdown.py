@@ -12,7 +12,7 @@ Telegraph Markdown -> HTML -> Node 转换回归测试
 import unittest
 from unittest.mock import patch
 
-from core.notify.telegraph import html_to_nodes, markdown_to_html, publish_changelog
+from core.notify.telegraph import edit_page, get_page, html_to_nodes, markdown_to_html, publish_changelog
 
 
 def _flatten(nodes) -> str:
@@ -218,6 +218,87 @@ class TelegraphMarkdownFeatureTests(unittest.TestCase):
         self.assertIn("<h3>English</h3>", content_html)
         self.assertIn("<h3>中文</h3>", content_html)
         self.assertIn("https://github.com/example/release", content_html)
+
+
+class TelegraphStructureRegressionTests(unittest.TestCase):
+    def test_claude_2064_unclosed_backtick_does_not_swallow_next_items(self):
+        markdown = (
+            "- Added support for .claude/rules/`. See docs for details.\n"
+            "- Fixed `--system-prompt` being ignored when using `--continue` or `--resume` flags\n"
+            "- Bedrock: Add support for `aws login` AWS Management Console credentials"
+        )
+        nodes = html_to_nodes(markdown_to_html(markdown))
+        self.assertEqual(3, len(nodes[0]["children"]))
+        self.assertIn("<code>--system-prompt</code>", markdown_to_html(markdown))
+        self.assertIn("<code>aws login</code>", markdown_to_html(markdown))
+
+    def test_hermes_patch_quote_does_not_consume_following_bold_list(self):
+        # Hermes v0.21.3: the old regex parsed <blockquote> as <b lockquote>,
+        # swallowing all markup through the first </b> of the next section.
+        markdown = (
+            "> Patch release. This tag rolls up the ~338 PRs merged since v0.21.2.\n\n"
+            "## What this patch ships for remote Desktop / Cloud users\n\n"
+            "- **Remote dashboard sessions no longer expire on refresh bursts** "
+            "(#110061). A slow identity provider no longer freezes `/api/status`.\n\n"
+            "## Also requested for this tag\n\n"
+            "- **Long-lived processes stop leaking duplicate state.db writer handles**"
+        )
+        nodes = html_to_nodes(markdown_to_html(markdown))
+        self.assertEqual(["blockquote", "h3", "ul", "h3", "ul"], [n["tag"] for n in nodes])
+        self.assertEqual("b", nodes[2]["children"][0]["children"][0]["tag"])
+        self.assertIn("no longer freezes /api/status.", _flatten(nodes))
+        self.assertNotRegex(_flatten(nodes), r"/?(?:blockquote|ul|li|b)>")
+
+    def test_nested_html_lists_keep_every_item_in_its_parent(self):
+        nodes = html_to_nodes(
+            "<ul><li>first<ul><li><b>nested</b> item</li></ul> tail</li>"
+            "<li>second</li></ul><p>after</p>"
+        )
+        first, second = nodes[0]["children"]
+        self.assertEqual("ul", first["children"][1]["tag"])
+        self.assertEqual("nested item", _flatten(first["children"][1]["children"]))
+        self.assertEqual(["second"], second["children"])
+        self.assertEqual("firstnested item tailsecondafter", _flatten(nodes))
+
+    def test_adjacent_inline_elements_keep_separator_space(self):
+        nodes = html_to_nodes("<p><code>ANTHROPIC_BASE_URL</code> <code>${CLAUDE_PLUGIN_ROOT}</code></p>")
+        self.assertEqual("ANTHROPIC_BASE_URL ${CLAUDE_PLUGIN_ROOT}", _flatten(nodes))
+
+    def test_code_entities_are_decoded_once(self):
+        nodes = html_to_nodes("<pre>&lt;target&gt; &amp;lt;name&amp;gt;\n\n</pre>")
+        self.assertEqual("<target> &lt;name&gt;\n\n", _flatten(nodes))
+
+
+class TelegraphPageEditingTests(unittest.TestCase):
+    @patch("core.notify.telegraph.requests.get")
+    def test_get_page_requests_content_and_returns_editability(self, mock_get):
+        mock_get.return_value.json.return_value = {
+            "ok": True, "result": {"path": "existing", "can_edit": True, "content": []},
+        }
+        result = get_page("existing", "secret")
+        self.assertTrue(result["page"]["can_edit"])
+        self.assertEqual("existing", mock_get.call_args.kwargs["params"]["path"])
+        self.assertTrue(mock_get.call_args.kwargs["params"]["return_content"])
+
+    @patch("core.notify.telegraph.requests.post")
+    def test_edit_preserves_url_and_sends_structured_content(self, mock_post):
+        mock_post.return_value.json.return_value = {
+            "ok": True,
+            "result": {"path": "existing", "url": "https://telegra.ph/existing", "content": []},
+        }
+        result = edit_page("existing", "Corrected title", "<p>Corrected</p>", "secret")
+        self.assertEqual("https://telegra.ph/existing", result["url"])
+        self.assertTrue(mock_post.call_args.args[0].endswith("/editPage"))
+        self.assertNotIn("author_name", mock_post.call_args.kwargs["data"])
+        self.assertEqual("existing", mock_post.call_args.kwargs["data"]["path"])
+
+    @patch("core.notify.telegraph.requests.post")
+    def test_edit_rejection_does_not_create_replacement(self, mock_post):
+        mock_post.return_value.json.return_value = {"ok": False, "error": "PAGE_ACCESS_DENIED"}
+        result = edit_page("existing", "Title", "<p>Corrected</p>", "secret")
+        self.assertFalse(result["success"])
+        self.assertEqual("PAGE_ACCESS_DENIED", result["error"])
+        self.assertEqual(1, mock_post.call_count)
 
 
 def _collect_hrefs(nodes) -> list:

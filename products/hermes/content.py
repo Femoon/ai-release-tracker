@@ -28,8 +28,11 @@ _CONTRIBUTORS_SECTION_PATTERN = re.compile(
     r"(?ms)^##\s+[^\n]*Contributors?\s*$.*\Z",
     flags=re.IGNORECASE,
 )
-_UPDATING_SECTION_PATTERN = re.compile(
-    r"(?ms)^##\s+(?:Updating|Installation|How to update)\s*$.*\Z",
+_ACTION_SECTION_PATTERN = re.compile(
+    r"(?ms)^##\s+(?:[^\w\n]+\s*)?"
+    r"(?:Updating|Installation|How to update|Upgrading|Upgrade(?: notes| guide)?|"
+    r"Migration(?: notes| guide)?|Recovery|Breaking changes)\s*$\n"
+    r".*?(?=^##\s+|^\*\*Full [Cc]hangelog:|\Z)",
     flags=re.IGNORECASE,
 )
 _RELEASE_HEADING_PATTERN = re.compile(
@@ -78,6 +81,14 @@ def _strip_release_metadata(content: str) -> str:
     """Remove PR citations and contributor credits from notification lines."""
     content = _CONTRIBUTORS_SECTION_PATTERN.sub("", content)
     content = "\n".join(_strip_trailing_github_citation(line) for line in content.splitlines())
+    # Remove the citation's wrapper together with the link. Do not strip empty
+    # parentheses globally: open() and other code are meaningful release text.
+    content = re.sub(
+        r"\(\s*" + _GITHUB_REFERENCE_LINK_PATTERN.pattern + r"\s*\)",
+        "",
+        content,
+        flags=re.IGNORECASE,
+    )
     content = _GITHUB_REFERENCE_LINK_PATTERN.sub("", content)
     cleaned = []
     for line in content.splitlines():
@@ -167,14 +178,24 @@ def _truncate_at_complete_bullet(
 
 
 def select_notification_content(body: str) -> str:
-    """Prefer preamble + Highlights; keep concise patch notes otherwise."""
+    """Keep upgrade/recovery actions first, then preamble + Highlights or notes."""
     if not body:
         return "（暂无更新说明）"
+
+    # Extract from the original body before removing contributor tails: upstream
+    # puts Updating after Contributors. Place actions first so long Highlights
+    # cannot consume the notification budget before a recovery warning is read.
+    actions = "\n\n".join(
+        match.group(0).strip() for match in _ACTION_SECTION_PATTERN.finditer(body)
+    )
+    body = _ACTION_SECTION_PATTERN.sub("", body)
+    actions = _strip_release_header(_strip_release_metadata(actions))
 
     highlights = _HIGHLIGHTS_PATTERN.search(body)
     if highlights and _has_substantive_content(highlights.group("body")):
         selected = f"{body[:highlights.start()]}{highlights.group(0)}"
         selected = _strip_release_header(_strip_release_metadata(selected))
+        selected = "\n\n".join(part for part in (actions, selected) if part)
         return _truncate_at_complete_bullet(
             selected,
             notice=(
@@ -187,7 +208,7 @@ def select_notification_content(body: str) -> str:
     content = body
     if highlights:
         content = f"{body[:highlights.start()]}{body[highlights.end():]}"
-    content = _UPDATING_SECTION_PATTERN.sub("", content)
     content = _strip_changelog_section(content)
     content = _strip_release_header(_strip_release_metadata(content))
+    content = "\n\n".join(part for part in (actions, content) if part)
     return _truncate_at_complete_bullet(content)

@@ -8,6 +8,34 @@ from products.codex import checker
 
 
 class CodexCheckerTests(unittest.TestCase):
+    def test_compare_only_release_survives_cleaning_and_notification_selection(self):
+        raw = "## Changelog\n\n**Full Changelog**: https://github.com/openai/codex/compare/rust-v0.151.0...rust-v0.152.0"
+        content = checker._notification_content(checker.clean_release_body(raw))
+        self.assertIn('https://github.com/openai/codex/compare/rust-v0.151.0...rust-v0.152.0', content)
+        self.assertTrue(content.strip())
+
+    def test_changelog_catalog_is_still_removed_after_meaningful_notes(self):
+        raw = "## Fixes\n- Fixed startup.\n\n## Changelog\n- Internal commit detail."
+        content = checker._notification_content(raw)
+        self.assertIn('Fixed startup', content)
+        self.assertNotIn('Internal commit', content)
+
+    def test_older_remote_candidate_never_translates_sends_or_advances_state(self):
+        with patch.object(sys, 'argv', ['checker.py']), \
+                patch.object(checker, 'fetch_releases_feed', return_value=('feed', None)), \
+                patch.object(checker, 'parse_latest_stable_release', return_value=(
+                    'rust-v0.153.0', '0.153.0', 'Older notes', 'https://github.com/openai/codex/releases/tag/rust-v0.153.0', None)), \
+                patch.object(checker, 'read_saved_version', return_value='rust-v0.154.0'), \
+                patch.object(checker, 'translate_changelog') as translate, \
+                patch.object(checker, 'send_bilingual_notification') as send, \
+                patch.object(checker, 'edit_bilingual_notification') as edit, \
+                patch.object(checker, 'save_version') as save:
+            self.assertEqual(checker.main(), 0)
+            translate.assert_not_called()
+            send.assert_not_called()
+            edit.assert_not_called()
+            save.assert_not_called()
+
     @patch.object(checker, "send_bilingual_notification")
     @patch.object(checker, "save_version")
     @patch.object(checker, "translate_changelog", return_value="")

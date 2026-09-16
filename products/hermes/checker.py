@@ -278,7 +278,7 @@ def notify_release(release):
         bot_token=TELEGRAM_BOT_TOKEN,
         chat_id=TELEGRAM_CHAT_ID,
         version_url=release["url"],
-        show_language_labels=True,
+        show_language_labels=False,
         content_kind=notification_content_kind(original),
     )
     if not result["success"]:
@@ -320,7 +320,7 @@ def maybe_edit_latest_release(release):
         bot_token=TELEGRAM_BOT_TOKEN,
         chat_id=TELEGRAM_CHAT_ID,
         version_url=release["url"],
-        show_language_labels=True,
+        show_language_labels=False,
         content_kind=notification_content_kind(original),
     )
     if not result["success"]:

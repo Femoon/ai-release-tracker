@@ -181,7 +181,7 @@ Thanks @contributor.
         self.assertNotIn("Highlights", content)
         self.assertIn("## Bug Fixes", content)
 
-    def test_patch_keeps_fenced_code_but_drops_updating_section(self):
+    def test_patch_keeps_fenced_code_and_updating_section(self):
         item = release("v2026.7.30", "0.19.1", "2026-07-30T00:00:00Z")
         item["body"] = """# Hermes Agent v0.19.1
 
@@ -200,7 +200,7 @@ uv tool install -U hermes-agent
 
         self.assertIn("```bash", content)
         self.assertIn("# or fresh install", content)
-        self.assertNotIn("Duplicate installation", content)
+        self.assertIn("Duplicate installation", content)
 
     def test_truncation_does_not_leave_an_unclosed_fenced_code_block(self):
         item = release("v2026.7.30", "0.19.1", "2026-07-30T00:00:00Z")

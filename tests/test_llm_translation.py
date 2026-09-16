@@ -2,7 +2,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from core.translate.llm import _normalize_bilingual_summary, _translation_max_tokens, translate_changelog
+from core.translate.llm import _normalize_bilingual_summary, _translation_max_tokens, summarize_changelog, translate_changelog
 from core.translate.policy import protect
 
 
@@ -52,8 +52,8 @@ class TranslateChangelogTests(unittest.TestCase):
         self.assertIn("Agent", translated)
         self.assertIn("`config.toml`", translated)
         self.assertEqual(mock_completion.call_count, 1)
-        self.assertEqual(mock_get.call_args.kwargs["kind"], "translate_guarded_v1")
-        self.assertEqual(mock_set.call_args.kwargs["kind"], "translate_guarded_v1")
+        self.assertEqual(mock_get.call_args.kwargs["kind"], "translate_guarded_v2")
+        self.assertEqual(mock_set.call_args.kwargs["kind"], "translate_guarded_v2")
 
     @patch("core.translate.llm.translation_cache.set")
     @patch("core.translate.llm.translation_cache.get", return_value=None)
@@ -307,6 +307,59 @@ class BuildExtraBodyTests(unittest.TestCase):
 
 
 class SummaryFormattingTests(unittest.TestCase):
+    @patch("core.translate.llm.translation_cache.set")
+    @patch("core.translate.llm.translation_cache.get", return_value=None)
+    @patch("core.translate.llm.completion")
+    def test_summary_uses_new_policy_cache_and_rejects_lost_command(
+        self, mock_completion, mock_get, mock_set
+    ):
+        mock_completion.return_value = response(
+            "*Key Updates:*\n• For damaged databases run `hermes doctor` first.\n\n"
+            "*更新要点：*\n• 数据库损坏时直接重新安装。"
+        )
+        self.assertEqual(summarize_changelog(
+            "If state.db is already damaged, run `hermes doctor` first.", MODEL, API_KEY
+        ), "")
+        self.assertEqual(mock_get.call_args.kwargs["kind"], "summarize_guarded_v3")
+        mock_set.assert_not_called()
+
+    @patch("core.translate.llm.translation_cache.set")
+    @patch("core.translate.llm.translation_cache.get", return_value=None)
+    @patch("core.translate.llm.completion")
+    def test_summary_rejects_invented_breaking_label(self, completion, _get, cache_set):
+        completion.return_value = response(
+            "*Key Updates:*\n• Breaking: secondary profiles no longer inherit allow-lists\n\n"
+            "*更新要点：*\n• 破坏性变更：次要配置不再继承允许列表"
+        )
+        self.assertEqual(summarize_changelog(
+            "Secondary profiles no longer inherit default allow-lists.", MODEL, API_KEY
+        ), "")
+        cache_set.assert_not_called()
+
+    def test_summary_rejects_translation_of_provider_identifier(self):
+        summary = (
+            "*Key Updates:*\n• Added the opencode-free zero-auth provider.\n\n"
+            "*更新要点：*\n• 新增无 opencode 的零认证提供方。"
+        )
+        self.assertEqual(_normalize_bilingual_summary(summary), "")
+        self.assertTrue(_normalize_bilingual_summary(
+            summary.replace("无 opencode 的零认证提供方", "opencode-free 免认证提供商")
+        ))
+
+    def test_summary_keeps_recovery_command_with_its_translation(self):
+        summary = (
+            "*Key Updates:*\n• If state.db is damaged, run `hermes doctor` first.\n\n"
+            "*更新要点：*\n• 若 state.db 已损坏，先运行 hermes doctor。"
+        )
+        self.assertTrue(_normalize_bilingual_summary(summary))
+        self.assertEqual(_normalize_bilingual_summary(
+            summary.replace("先运行 hermes doctor", "重新安装")
+        ), "")
+
+    def test_summary_rejects_extra_untranslated_claim(self):
+        summary = "*Key Updates:*\n• First\n• Second\n\n*更新要点：*\n• 第一条"
+        self.assertEqual(_normalize_bilingual_summary(summary), "")
+
     def test_summary_is_capped_to_six_bilingual_pairs(self):
         english = [f"• English item {index}" for index in range(10)]
         chinese = [f"• 中文要点 {index}" for index in range(10)]

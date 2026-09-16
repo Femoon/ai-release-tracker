@@ -2,14 +2,13 @@
 # -*- coding: utf-8 -*-
 """
 OpenClaw 版本更新检查脚本
-从 GitHub 拉取 CHANGELOG.md，检查是否有新版本发布
+从 GitHub 正式发布记录及对应更新日志检查新版本
 """
 
 import argparse
 import os
 import re
 import sys
-import requests
 
 # 加载 .env 文件
 from dotenv import load_dotenv
@@ -20,6 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from core.notify.telegram import edit_bilingual_notification, send_bilingual_notification
 from core.translate import translate_changelog
 from products.openclaw.content import select_notification_content
+from products.openclaw.source import fetch_release_changelog, release_url
 from core.state import (
     compute_body_hash,
     read_message_state as _read_message_state,
@@ -29,7 +29,6 @@ from core.state import (
 )
 
 # 配置
-CHANGELOG_URL = "https://raw.githubusercontent.com/openclaw/openclaw/refs/heads/main/CHANGELOG.md"
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
 VERSION_FILE = os.path.join(PROJECT_ROOT, "output", "openclaw_latest_version.txt")
@@ -44,19 +43,13 @@ VERSION_PATTERN = r'^## (\d{4}\.\d{1,2}\.\d{1,2}(?:-\d+)?)'
 
 
 def fetch_changelog():
-    """从 GitHub 获取 CHANGELOG.md 内容"""
-    try:
-        response = requests.get(CHANGELOG_URL, timeout=10)
-        response.raise_for_status()
-        return response.text
-    except requests.RequestException as e:
-        print(f"获取更新日志失败: {e}")
-        return None
+    """仅获取 GitHub 已正式发布的最新版本日志。"""
+    return fetch_release_changelog()
 
 
 def _is_beta_version(version_line):
     """检查版本行是否包含 beta 标记"""
-    return "beta" in version_line.lower()
+    return bool(re.search(r"\b(?:beta|alpha|rc|unreleased)\b", version_line, re.I))
 
 
 def _parse_version_tuple(version_str):
@@ -105,7 +98,7 @@ def _parse_version_content(changelog_text, target_version=None):
                 break
             current = match.group(1)
             # 跳过 beta 版本（仅在搜索最新版本时）
-            if target_version is None and _is_beta_version(line):
+            if _is_beta_version(line):
                 continue
             if target_version is None or current == target_version:
                 found_version = current
@@ -190,7 +183,7 @@ def main():
     print("-" * 50)
 
     # 获取最新的 CHANGELOG
-    changelog = fetch_changelog()
+    changelog = fetch_release_changelog(args.target_version) if args.target_version else fetch_changelog()
     if not changelog:
         return 1
 
@@ -237,6 +230,7 @@ def main():
             original=notification_content,
             translated=translated,
             title="OpenClaw",
+            version_url=release_url(push_version),
             bot_token=TELEGRAM_BOT_TOKEN,
             chat_id=TELEGRAM_CHAT_ID
         )
@@ -298,6 +292,7 @@ def main():
                     original=notification_content,
                     translated=translated,
                     title="OpenClaw",
+                    version_url=release_url(latest_version),
                     bot_token=TELEGRAM_BOT_TOKEN,
                     chat_id=TELEGRAM_CHAT_ID
                 )
@@ -343,6 +338,7 @@ def main():
             original=notification_content,
             translated=translated,
             title="OpenClaw",
+            version_url=release_url(latest_version),
             bot_token=TELEGRAM_BOT_TOKEN,
             chat_id=TELEGRAM_CHAT_ID
         )

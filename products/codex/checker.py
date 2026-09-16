@@ -35,6 +35,8 @@ from core.state import (
 # 配置
 RELEASES_ATOM_URL = "https://github.com/openai/codex/releases.atom"
 GITHUB_RELEASE_BY_TAG_URL = "https://api.github.com/repos/openai/codex/releases/tags/{tag}"
+GITHUB_RELEASES_URL = "https://api.github.com/repos/openai/codex/releases"
+MAX_RELEASE_PAGES = 20
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
 VERSION_FILE = os.path.join(PROJECT_ROOT, "output", "codex_latest_version.txt")
@@ -263,7 +265,63 @@ def parse_latest_stable_release(feed_xml):
     if found_stable:
         return found_stable[0], found_stable[1], found_stable[2], found_stable[3], None
 
-    return None, None, None, None, None
+    print("  [备用] Atom 中没有稳定 CLI release，分页查询 GitHub Releases API")
+    return fetch_latest_stable_release_via_api()
+
+
+def fetch_latest_stable_release_via_api():
+    """Search past nightly/SDK releases; API failures never mean no new release."""
+    for page in range(1, MAX_RELEASE_PAGES + 1):
+        try:
+            response = requests.get(
+                GITHUB_RELEASES_URL,
+                headers=github_headers(),
+                params={"per_page": 100, "page": page},
+                timeout=10,
+            )
+        except requests.RequestException:
+            return None, None, None, None, "releases_api: network_error"
+        if response.status_code != 200:
+            return None, None, None, None, f"releases_api: http_{response.status_code}"
+        try:
+            releases = response.json()
+        except ValueError:
+            return None, None, None, None, "releases_api: json_error"
+        if not isinstance(releases, list) or any(not isinstance(item, dict) for item in releases):
+            return None, None, None, None, "releases_api: invalid_response"
+
+        stable = [item for item in releases if is_stable_cli_release(item)]
+        if stable:
+            # API pages are newest-first; do not let a backport published beside
+            # the current release win just because it appears first in the page.
+            item = max(stable, key=lambda item: _cli_version_tuple(item["tag_name"]))
+            tag = item["tag_name"]
+            return (
+                tag,
+                item.get("name") or tag,
+                clean_release_body(item.get("body") or ""),
+                item.get("html_url") or f"https://github.com/openai/codex/releases/tag/{tag}",
+                None,
+            )
+        if len(releases) < 100:
+            return None, None, None, None, None
+    return None, None, None, None, "releases_api: pagination_limit_reached"
+
+
+def _cli_version_tuple(tag):
+    return tuple(int(part) for part in tag.removeprefix("rust-v").split("."))
+
+
+def _notification_content(content):
+    """Keep the comparison when stripping Changelog would empty the release."""
+    if not content:
+        return "（暂无更新说明）"
+    selected = _strip_changelog_section(content)
+    if not selected.strip():
+        comparison = re.search(r"https://github\.com/openai/codex/compare/[^\s)<>]+", content)
+        if comparison:
+            return f"Full Changelog: {comparison.group(0)}"
+    return selected
 
 
 def clean_html_content(html_text):
@@ -434,7 +492,7 @@ def main():
         print("-" * 50)
 
         # 去掉 Changelog 详细列表后再翻译
-        original_content = _strip_changelog_section(target_content) if target_content else "（暂无更新说明）"
+        original_content = _notification_content(target_content)
         original_content = limit_notification_content(original_content, target_link)
         translated = translate_changelog(original_content) if target_content else ""
         if target_content and original_content.strip() and not translated:
@@ -514,7 +572,7 @@ def main():
         print("-" * 50)
 
         # 去掉 Changelog 详细列表后再翻译
-        original_content = _strip_changelog_section(latest_content) if latest_content else "（暂无更新说明）"
+        original_content = _notification_content(latest_content)
         original_content = limit_notification_content(original_content, release_link)
         translated = translate_changelog(original_content) if latest_content else ""
         if latest_content and original_content.strip() and not translated:
@@ -559,15 +617,25 @@ def main():
         print("提示：请检查 GH_TOKEN 是否有效")
         return 1
 
-    # 如果无法验证非标准版本格式，警告但继续（允许用户手动处理）
-    if resolve_error == "unable_to_verify":
+    # An SDK tag is not evidence of the last notified CLI release, even when
+    # its numeric version matches. Never turn state migration into a new post.
+    # Stop for manual reconciliation rather than silently replaying CLI history.
+    if resolve_error or not is_stable_cli_tag(saved_tag):
         print("-" * 50)
-        print("⚠️  警告：无法验证保存的版本格式")
+        print("⚠️  保存的版本无法确认为 CLI 稳定版本，停止自动通知以避免重复推送")
         print(f"    保存的版本: {saved_version}")
         print(f"    最新版本: {latest_tag}")
-        print("    建议：如果这是新安装，将自动使用最新版本")
+        print("    请核对历史频道消息，再将状态绑定到已确认推送的 rust-vX.Y.Z；不能将 SDK 同号版本视为 CLI")
+        return 1
 
     # 比对版本
+    if (
+        is_stable_cli_tag(saved_tag)
+        and _cli_version_tuple(latest_tag) < _cli_version_tuple(saved_tag)
+    ):
+        print(f"远程候选 {latest_tag} 早于已记录版本 {saved_tag}，跳过以避免旧版重推")
+        return 0
+
     if saved_tag == latest_tag:
         # 版本相同，检查 body 是否有更新
         print("-" * 50)
@@ -602,7 +670,7 @@ def main():
                 print("检测到 Release Notes 已更新，正在编辑之前发送的通知...")
 
                 # 去掉 Changelog 详细列表后再翻译
-                original_content = _strip_changelog_section(latest_content) if latest_content else "（暂无更新说明）"
+                original_content = _notification_content(latest_content)
                 original_content = limit_notification_content(original_content, release_link)
                 translated = translate_changelog(original_content) if latest_content else ""
                 if latest_content and original_content.strip() and not translated:
@@ -652,7 +720,7 @@ def main():
             print("（暂无更新说明）")
         print("-" * 50)
         # 去掉 Changelog 详细列表后再翻译
-        original_content = _strip_changelog_section(latest_content) if latest_content else "（暂无更新说明）"
+        original_content = _notification_content(latest_content)
         original_content = limit_notification_content(original_content, release_link)
         translated = translate_changelog(original_content) if latest_content else ""
 

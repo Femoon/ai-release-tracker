@@ -20,6 +20,19 @@ def long_document(term_count: int):
 
 
 class TranslationPolicyTests(unittest.TestCase):
+    def test_provider_identifier_is_protected_as_one_unit(self):
+        source = "- Added the opencode-free zero-auth provider."
+        document = protect(source)
+        self.assertEqual([item.source for item in document.placeholders], ["opencode-free"])
+        self.assertNotIn("opencode-free", document.protected)
+        self.assertEqual(restore(document, document.protected), source)
+        self.assertFalse(validate(document, "- 新增无 opencode 的零认证提供商。").valid)
+
+    def test_prompt_again_is_translatable_verb_without_replacing_prompt_noun(self):
+        document = protect("- Prompt text: permissions prompt again after expiry.")
+        self.assertIn(" prompt again", document.protected)
+        self.assertEqual([item.source for item in document.placeholders], ["Prompt", "permissions"])
+
     def test_protects_case_and_plural_variants(self):
         source = "- Subagent and subagents use agent prompts, Skills, Sandboxes, and Memories."
 
