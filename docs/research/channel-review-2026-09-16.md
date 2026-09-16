@@ -5,7 +5,7 @@
 - 按最新要求停止补推；历史修正只调用 `editMessageText` / Telegraph `editPage`。
 - Telegram 不显示独立的 English / 中文标题，仍保留双语内容。
 - 不以重新发布替代原地编辑；保留原消息 ID、顺序与文章链接。
-- 审核完成后按用户要求提交、推送并部署；保留用户原有 CLAUDE.md、AGENTS.md 变更，不纳入本次提交。
+- 审核完成后按用户要求提交、推送并部署；用户随后要求将原有 CLAUDE.md、AGENTS.md 变更一并提交，保留其内容及符号链接结构。
 
 ## 修正
 
