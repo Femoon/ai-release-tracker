@@ -56,10 +56,18 @@ def release_content(release):
             body = response.text.strip()
     # GitHub release status is authoritative, but conflicting notes should
     # fail closed rather than announce an explicitly unreleased document.
-    if re.search(r"(?im)^#{1,2}\s+[^\n]*\b(?:unreleased|beta|alpha|rc)\b", body):
-        raise ValueError(f"OpenClaw {version} notes are marked unreleased/prerelease")
     body = body.replace("\r\n", "\n").replace("\r", "\n")
     body = re.sub(r"<!--.*?-->", "", body, flags=re.S)
+    status = r"(?:unreleased|beta|alpha|rc)(?:[.-]?\d+)?"
+    standalone_status = rf"(?:OpenClaw\s*)?(?:{status}|\(\s*{status}\s*\))"
+    version_status = (
+        rf"(?:OpenClaw\s+)?v?{re.escape(version)}"
+        rf"(?:-{status}(?=\s|$)|\s*\(\s*{status}\s*\))"
+    )
+    for heading in re.findall(r"(?m)^#{1,6}[ \t]+([^\n]+)", body):
+        heading = re.sub(r"\s+#+\s*$", "", heading).strip()
+        if re.fullmatch(standalone_status, heading, re.I) or re.match(version_status, heading, re.I):
+            raise ValueError(f"OpenClaw {version} notes are marked unreleased/prerelease")
     body = re.sub(r"(?m)^#{1,3}[ \t]+(?:OpenClaw[ \t]+)?v?" + re.escape(version) + r"[ \t]*$", "", body).strip()
     return f"## {version}\n\n{body}"
 

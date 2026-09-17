@@ -125,6 +125,64 @@ openclaw doctor --repair
         selected = select_notification_content("## 2026.7.1-2\n\n### Fixes\n\n- Accept npm singleton-array metadata.")
         self.assertIn("Accept npm singleton-array metadata", selected)
 
+    def test_action_keeps_adjacent_commands_outside_named_action_sections(self):
+        for command in ("```sh\nopenclaw sessions rebuild\n```", "    openclaw sessions rebuild"):
+            with self.subTest(command=command):
+                selected = select_notification_content(
+                    "## 2026.9.4\n### Highlights\n- New UI.\n### Fixes\n"
+                    "Users must run this repair command before upgrading:\n\n" + command
+                )
+                self.assertIn("Users must run", selected)
+                self.assertIn(command, selected)
+
+    def test_truncation_does_not_leave_instruction_without_its_commands(self):
+        selected = select_notification_content(
+            "## 2026.9.4\n### Highlights\n- New UI.\n### Fixes\n"
+            "Users must run this repair command before upgrading:\n\n"
+            "```sh\n" + "openclaw sessions rebuild\n" * 400 + "```\n"
+        )
+        self.assertLessEqual(len(selected), 8000)
+        self.assertNotIn("Users must run", selected)
+        self.assertNotIn("```", selected)
+        self.assertIn("Complete official release notes", selected)
+
+    def test_truncation_keeps_a_short_action_with_multiple_commands(self):
+        selected = select_notification_content(
+            "## 2026.9.4\n### Highlights\n" + "- New UI.\n" * 2000
+            + "### Fixes\nUsers must run both commands:\n\n"
+            "```sh\nopenclaw doctor\n```\n\n```sh\nopenclaw sessions rebuild\n```\n"
+        )
+        self.assertLessEqual(len(selected), 8000)
+        self.assertIn("Users must run both commands", selected)
+        self.assertIn("```sh\nopenclaw doctor\n```", selected)
+        self.assertIn("```sh\nopenclaw sessions rebuild\n```", selected)
+
+    def test_recovery_scope_and_nested_heading_stay_with_commands(self):
+        selected = select_notification_content(
+            "## 2026.9.4\n### Highlights\n- New UI.\n"
+            "### Recovery for Windows users only\n\n"
+            "#### Existing installations\n\nUsers must run:\n\n"
+            "```sh\nopenclaw sessions rebuild\n```\n"
+            "### Fixes\n- Routine fix.\n"
+        )
+        self.assertIn(
+            "### Recovery for Windows users only\n\n#### Existing installations\n\n"
+            "Users must run:\n\n```sh\nopenclaw sessions rebuild\n```", selected
+        )
+        self.assertNotIn("Routine fix", selected)
+
+    def test_truncation_omits_scope_and_instruction_with_oversized_command(self):
+        selected = select_notification_content(
+            "## 2026.9.4\n### Highlights\n- New UI.\n"
+            "### Recovery for Windows users only\n\nUsers must run:\n\n"
+            "```sh\n" + "openclaw sessions rebuild\n" * 400 + "```\n"
+        )
+        self.assertLessEqual(len(selected), 8000)
+        self.assertNotIn("Windows users only", selected)
+        self.assertNotIn("Users must run", selected)
+        self.assertNotIn("```", selected)
+        self.assertIn("Complete official release notes", selected)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -239,12 +239,12 @@ def parse_latest_stable_release(feed_xml):
             print(f"  [确认] 这是一个稳定版本 ✓ (规范 tag: {canonical_tag})")
 
             # 记录找到的稳定版本，但不立即返回（需要检查是否有 API 错误）
-            if found_stable is None:
+            if found_stable is None or _cli_version_tuple(canonical_tag) > _cli_version_tuple(found_stable[0]):
                 content = clean_release_body(release_data.get("body") or "")
                 found_stable = (canonical_tag, title, content, link)
 
-            # 找到第一个稳定版本后就停止
-            break
+            # Backports can precede the current CLI release in the feed too.
+            continue
 
         # 记录跳过原因（tag_only, draft, prerelease）
         status_messages = {
@@ -270,7 +270,8 @@ def parse_latest_stable_release(feed_xml):
 
 
 def fetch_latest_stable_release_via_api():
-    """Search past nightly/SDK releases; API failures never mean no new release."""
+    """Select the highest stable CLI version only after exhausting release pages."""
+    latest = None
     for page in range(1, MAX_RELEASE_PAGES + 1):
         try:
             response = requests.get(
@@ -291,20 +292,22 @@ def fetch_latest_stable_release_via_api():
             return None, None, None, None, "releases_api: invalid_response"
 
         stable = [item for item in releases if is_stable_cli_release(item)]
-        if stable:
-            # API pages are newest-first; do not let a backport published beside
-            # the current release win just because it appears first in the page.
-            item = max(stable, key=lambda item: _cli_version_tuple(item["tag_name"]))
-            tag = item["tag_name"]
+        # GitHub's release ordering is not semantic-version ordering: an older
+        # backport can precede a newer CLI version, including across pages.
+        for item in stable:
+            if latest is None or _cli_version_tuple(item["tag_name"]) > _cli_version_tuple(latest["tag_name"]):
+                latest = item
+        if len(releases) < 100:
+            if latest is None:
+                return None, None, None, None, None
+            tag = latest["tag_name"]
             return (
                 tag,
-                item.get("name") or tag,
-                clean_release_body(item.get("body") or ""),
-                item.get("html_url") or f"https://github.com/openai/codex/releases/tag/{tag}",
+                latest.get("name") or tag,
+                clean_release_body(latest.get("body") or ""),
+                latest.get("html_url") or f"https://github.com/openai/codex/releases/tag/{tag}",
                 None,
             )
-        if len(releases) < 100:
-            return None, None, None, None, None
     return None, None, None, None, "releases_api: pagination_limit_reached"
 
 

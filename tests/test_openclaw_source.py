@@ -65,6 +65,36 @@ class OpenClawSourceTests(unittest.TestCase):
         text = source.release_content(release(body="## 2026.9.4\r\n\r\n### Highlights\r\n- Real change."))
         self.assertIn("Real change", checker.parse_latest_version(text)[1])
 
+    def test_stable_release_can_discuss_prerelease_channels(self):
+        for heading in (
+            "## Beta channel fixes", "## Alpha provider support", "# RC compatibility",
+            "## 2026.9.4 — Beta channel fixes", "# OpenClaw v2026.9.4 - RC compatibility",
+            "## 2026.9.4 (Beta channel fixes)",
+            "## 2026.9.40 (Unreleased)",
+        ):
+            with self.subTest(heading=heading):
+                text = source.release_content(release(body=heading + "\n- Stable change."))
+                self.assertIn("Stable change", text)
+
+    def test_prerelease_markers_are_rejected_on_version_headings(self):
+        for heading in (
+            "## 2026.9.4 (Unreleased)", "# OpenClaw v2026.9.4 (Beta)",
+            "### v2026.9.4-rc.1", "## 2026.9.4-beta.2", "## 2026.9.4-alpha1",
+            "#### 2026.9.4 (RC.1) ##", "## 2026.9.4 (Unreleased)\r",
+        ):
+            with self.subTest(heading=heading), self.assertRaises(ValueError):
+                source.release_content(release(body=heading + "\n- Preview."))
+
+    def test_standalone_explicit_status_headings_are_rejected(self):
+        for heading in ("## Unreleased", "# OpenClaw (Unreleased)", "### OpenClaw(Unreleased)",
+                        "## (Beta)", "# Alpha", "## RC.1", "## Unreleased ##"):
+            with self.subTest(heading=heading), self.assertRaises(ValueError):
+                source.release_content(release(body=heading + "\n- Preview."))
+
+    def test_commented_status_heading_is_not_release_status(self):
+        text = source.release_content(release(body="<!--\n## Unreleased\n-->\n- Stable change."))
+        self.assertIn("Stable change", text)
+
 
 if __name__ == "__main__":
     unittest.main()

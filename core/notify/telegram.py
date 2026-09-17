@@ -90,10 +90,20 @@ def process_message_for_markdown_v2(text: str) -> str:
     result = escape_markdown(text)
 
     for idx, bold_content in enumerate(bolds):
-        result = result.replace(
-            bold_placeholder.format(idx),
-            f'*{escape_markdown(bold_content)}*',
-        )
+        # Telegram forbids code inside bold; links may retain their emphasis.
+        tokens = re.split(r'(TGCODE\d+TOKEN)', bold_content)
+        rendered = []
+        for token in tokens:
+            if not token:
+                continue
+            if re.fullmatch(r'TGCODE\d+TOKEN', token):
+                rendered.append(token)
+            else:
+                # Leave separators outside emphasis rather than emit * *.
+                match = re.fullmatch(r'(\s*)(.*?)(\s*)', token, flags=re.DOTALL)
+                leading, body, trailing = match.groups()
+                rendered.append(leading + (f'*{escape_markdown(body)}*' if body else '') + trailing)
+        result = result.replace(bold_placeholder.format(idx), ''.join(rendered))
 
     # 恢复超链接
     for idx, (link_text, link_url) in enumerate(links):

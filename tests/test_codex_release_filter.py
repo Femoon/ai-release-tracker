@@ -22,6 +22,12 @@ def feed(*tags):
 
 
 class CodexReleaseFilterTests(unittest.TestCase):
+    @patch.object(checker, 'verify_release_via_api')
+    def test_atom_backport_does_not_hide_higher_stable_version(self, verify):
+        verify.side_effect = lambda tag: (release(tag), 'stable')
+        result = checker.parse_latest_stable_release(feed('rust-v0.153.1', 'rust-v0.155.0', 'rust-v0.154.0'))
+        self.assertEqual(result[0], 'rust-v0.155.0')
+
     def test_tag_whitelist(self):
         for tag in ('python-v0.154.0', 'js-v0.154.0', 'rust-v0.154.0-alpha.1',
                     'rust-v0.154.0-beta', 'rust-v0.154.0-rc1', '0.154.0', '', None):
@@ -71,6 +77,51 @@ class CodexReleaseFilterTests(unittest.TestCase):
         self.assertEqual(result[2], 'CLI notes')
         self.assertIsNone(result[-1])
         self.assertEqual([call.kwargs['params']['page'] for call in get.call_args_list], [1, 2])
+
+    @patch.object(checker.requests, 'get')
+    def test_fallback_selects_highest_stable_version_across_all_pages(self, get):
+        page_one = [release('rust-v0.9.9')] + [release(f'rust-v0.155.0-alpha.{i}') for i in range(99)]
+        page_two = [release('rust-v0.10.0')] + [release(f'python-v0.200.{i}') for i in range(99)]
+        page_three = [release('rust-v0.11.0'),
+                      {**release('rust-v0.999.0'), 'prerelease': True},
+                      {**release('rust-v0.998.0'), 'draft': True}]
+        get.side_effect = [Mock(status_code=200, json=lambda: page_one),
+                           Mock(status_code=200, json=lambda: page_two),
+                           Mock(status_code=200, json=lambda: page_three)]
+        result = checker.fetch_latest_stable_release_via_api()
+        self.assertEqual(result[0], 'rust-v0.11.0')
+        self.assertIsNone(result[-1])
+        self.assertEqual([call.kwargs['params'] for call in get.call_args_list],
+                         [{'per_page': 100, 'page': page} for page in (1, 2, 3)])
+
+    @patch.object(checker.requests, 'get')
+    def test_partial_stable_candidate_is_not_returned_after_later_page_failure(self, get):
+        page_one = [release('rust-v0.154.0')] * 100
+        for later in (Mock(status_code=503),
+                      Mock(status_code=200, json=Mock(side_effect=ValueError('bad json'))),
+                      checker.requests.ConnectionError('offline')):
+            with self.subTest(later=type(later).__name__):
+                get.side_effect = [Mock(status_code=200, json=lambda: page_one), later]
+                result = checker.fetch_latest_stable_release_via_api()
+                self.assertEqual(result[:4], (None,) * 4)
+                self.assertTrue(result[-1])
+
+    @patch.object(checker.requests, 'get')
+    def test_pagination_limit_rejects_partial_stable_candidate(self, get):
+        get.return_value = Mock(status_code=200, json=lambda: [release('rust-v0.154.0')] * 100)
+        with patch.object(checker, 'MAX_RELEASE_PAGES', 2):
+            result = checker.fetch_latest_stable_release_via_api()
+        self.assertEqual(result, (None, None, None, None, 'releases_api: pagination_limit_reached'))
+        self.assertEqual(get.call_count, 2)
+
+    @patch.object(checker.requests, 'get')
+    def test_final_empty_page_returns_prior_candidate_without_extra_request(self, get):
+        get.side_effect = [Mock(status_code=200, json=lambda: [release('rust-v0.154.0')] * 100),
+                           Mock(status_code=200, json=lambda: [])]
+        result = checker.fetch_latest_stable_release_via_api()
+        self.assertEqual(result[0], 'rust-v0.154.0')
+        self.assertIsNone(result[-1])
+        self.assertEqual(get.call_count, 2)
 
     @patch.object(checker.requests, 'get')
     def test_fallback_failures_are_errors_not_empty_success(self, get):

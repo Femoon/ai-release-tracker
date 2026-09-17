@@ -10,6 +10,34 @@ from core.notify.telegram import (
 
 
 class TelegramFormattingTests(unittest.TestCase):
+    def test_bold_and_heading_filenames_remain_standalone_code(self):
+        for source in ("**CLAUDE.md**", "## CLAUDE.md", "**AGENTS.md**"):
+            with self.subTest(source=source):
+                filename = "AGENTS.md" if "AGENTS.md" in source else "CLAUDE.md"
+                self.assertEqual(
+                    process_message_for_markdown_v2(clean_for_telegram(source)),
+                    f"`{filename}`",
+                )
+
+    def test_bold_splits_around_multiple_literal_code_entities(self):
+        source = '**Use `foo_bar` and `codex-package-<target>` now**'
+        self.assertEqual(
+            process_message_for_markdown_v2(source),
+            '*Use* `foo_bar` *and* `codex-package-<target>` *now*',
+        )
+        self.assertEqual(process_message_for_markdown_v2('**`a` `b`**'), '`a` `b`')
+
+    def test_bold_code_split_preserves_links_and_ordinary_bold(self):
+        source = '**Read [docs](https://example.com) and `a`**; **ordinary bold**'
+        self.assertEqual(
+            process_message_for_markdown_v2(source),
+            '*Read [docs](https://example.com) and* `a`; *ordinary bold*',
+        )
+        self.assertEqual(
+            process_message_for_markdown_v2('**See [`foo_bar`](https://example.com)**'),
+            '*See [foo\\_bar](https://example.com)*',
+        )
+
     def test_crlf_fence_preserves_shell_commands(self):
         source = '### Update\r\n```bash\r\n# keep comment\r\ncodex --version\r\n```'
         for text in (source, clean_for_telegram(source)):

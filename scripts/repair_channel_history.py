@@ -18,7 +18,7 @@ from dotenv import dotenv_values
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from core.notify.telegram import clean_for_telegram, process_message_for_markdown_v2, release_source_url
-from scripts.audit_channel_history import source_overrides
+from scripts.audit_channel_history import parse_channel, source_overrides
 
 CONFIG = {
     "claude_code_push": ("Claude Code", "CLAUDE_CODE"),
@@ -126,8 +126,52 @@ def prepare(message, channel):
     if not reasons:
         reasons.append("format_consistency")
     return {"post": message["post"], "channel": channel, "id": message["id"],
-            "before": original, "after": after, "reasons": sorted(set(reasons)),
+            "before": original, "before_body": message["body"],
+            "after": after, "reasons": sorted(set(reasons)),
             "sha256": hashlib.sha256(after.encode()).hexdigest()}
+
+
+def snapshot_structure(body):
+    """Ignore the message wrapper but retain every inner entity and attribute."""
+    def normalize(node):
+        if isinstance(node, str):
+            return node
+        tag = {"strong": "b", "em": "i", "strike": "s", "del": "s"}.get(node["tag"], node["tag"])
+        return {
+            "tag": tag,
+            "attrs": node.get("attrs", {}),
+            "children": children(node.get("children", [])),
+        }
+
+    def children(items):
+        result = []
+        for item in items:
+            value = normalize(item)
+            if isinstance(value, str) and result and isinstance(result[-1], str):
+                result[-1] += value
+            else:
+                result.append(value)
+        return result
+
+    return children(body["children"])
+
+
+def verify_snapshot(session, plan):
+    """Fail closed if the public target is unreadable or changed since review."""
+    if not isinstance(plan.get("before_body"), dict) or "children" not in plan["before_body"]:
+        return "Snapshot lacks message structure; regenerate plan before editing"
+    response = session.get(
+        f'https://t.me/{plan["post"]}',
+        params={"embed": "1", "_": time.time_ns()}, timeout=30,
+    )
+    response.raise_for_status()
+    current = next((m for m in parse_channel(response.text)
+                    if m["post"] == plan["post"]), None)
+    if current is None:
+        return "Current message unavailable; refusing to overwrite"
+    if snapshot_structure(current["body"]) != snapshot_structure(plan["before_body"]):
+        return "Message changed since snapshot; refusing to overwrite"
+    return None
 
 
 def apply_channel(plans, config, results_dir):
@@ -158,7 +202,11 @@ def apply_channel(plans, config, results_dir):
         for attempt in range(16):
             wait_for_edit_slot(channel)
             try:
-                response = session.post(base + "/editMessageText", json=payload, timeout=30).json()
+                conflict = verify_snapshot(session, plan)
+                if conflict:
+                    response = {"ok": False, "description": conflict}
+                else:
+                    response = session.post(base + "/editMessageText", json=payload, timeout=30).json()
             except requests.RequestException:
                 response = {"ok": False, "description": "Network error (redacted)"}
             retry_after = response.get("parameters", {}).get("retry_after")
