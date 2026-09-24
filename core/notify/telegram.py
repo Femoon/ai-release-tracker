@@ -380,6 +380,17 @@ def _build_bilingual_messages(
     }
 
 
+def _telegraph_notification_message(
+    title: str, summary: str, translated: str, link_line: str
+) -> str:
+    if summary:
+        return f"{title}\n\n{summary}{link_line}"
+    if translated:
+        print("总结重试后仍失败，发送带完整日志链接的降级通知")
+        return f"{title}\n\n*Summary unavailable / 暂无摘要*{link_line}"
+    return f"{title}{link_line}"
+
+
 def send_bilingual_notification(
     version: str,
     original: str,
@@ -427,6 +438,8 @@ def send_bilingual_notification(
         from core.notify.telegraph import publish_changelog
         from core.translate.llm import summarize_changelog
 
+        summary = summarize_changelog(original)
+
         # Telegraph：发布完整中英文对照（上游已去掉 Changelog）
         telegraph_result = publish_changelog(
             title=title,
@@ -444,9 +457,6 @@ def send_bilingual_notification(
         telegraph_url = telegraph_result["url"]
         cn_url = telegraph_result.get("cn_url")
 
-        # TG 消息：AI 生成简短总结 + Telegraph 链接
-        summary = summarize_changelog(original)
-
         if cn_url and content_kind == "highlights":
             link_line = (
                 f"\n\n[English highlights]({telegraph_url}) | [中文高光]({cn_url})"
@@ -460,10 +470,9 @@ def send_bilingual_notification(
         if version_url:
             link_line += f" | [GitHub]({version_url})"
 
-        if summary:
-            message = f"{msgs['en_title']}\n\n{summary}{link_line}"
-        else:
-            message = f"{msgs['en_title']}{link_line}"
+        message = _telegraph_notification_message(
+            msgs["en_title"], summary, translated, link_line
+        )
 
         result = send_telegram_message(message, bot_token, chat_id)
         message_ids = [result["message_id"]] if result["message_id"] else []
@@ -534,6 +543,8 @@ def edit_bilingual_notification(
         from core.notify.telegraph import publish_changelog
         from core.translate.llm import summarize_changelog
 
+        summary = summarize_changelog(original)
+
         telegraph_result = publish_changelog(
             title=title,
             original=original,
@@ -550,9 +561,6 @@ def edit_bilingual_notification(
         telegraph_url = telegraph_result["url"]
         cn_url = telegraph_result.get("cn_url")
 
-        # AI 生成简短总结
-        summary = summarize_changelog(original)
-
         if cn_url and content_kind == "highlights":
             link_line = (
                 f"\n\n[English highlights]({telegraph_url}) | [中文高光]({cn_url})"
@@ -566,10 +574,9 @@ def edit_bilingual_notification(
         if version_url:
             link_line += f" | [GitHub]({version_url})"
 
-        if summary:
-            short_message = f"{msgs['en_title']}\n\n{summary}{link_line}"
-        else:
-            short_message = f"{msgs['en_title']}{link_line}"
+        short_message = _telegraph_notification_message(
+            msgs["en_title"], summary, translated, link_line
+        )
 
         edit_results = []
         for idx, message_id in enumerate(message_ids):

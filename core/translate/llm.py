@@ -517,37 +517,46 @@ Example output format:
 Only output the summary in the demonstrated format."""
 
     try:
-        response = completion(
-            model=model,
-            api_key=api_key,
-            messages=[
-                {"role": "system", "content": summary_system},
-                {"role": "user", "content": summarize_input},
-            ],
-            temperature=0.3,
-            max_tokens=_SUMMARIZE_MAX_TOKENS,
-            extra_body=_build_extra_body(),
-        )
-        if not response.choices or len(response.choices) == 0:
-            print("总结生成失败: API 返回空结果")
-            return ""
+        for attempt in range(2):
+            system_prompt = summary_system
+            if attempt:
+                system_prompt += (
+                    "\nThe previous response failed validation. Regenerate from the release "
+                    "notes with exactly matched English and Chinese bullets, at most "
+                    "6 pairs and 1800 characters. Preserve every identifier in its "
+                    "paired translation; do not invent a breaking-change label."
+                )
+            response = completion(
+                model=model,
+                api_key=api_key,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": summarize_input},
+                ],
+                temperature=0.3 if not attempt else 0,
+                max_tokens=_SUMMARIZE_MAX_TOKENS,
+                extra_body=_build_extra_body(),
+            )
+            if not response.choices:
+                print("总结生成失败: API 返回空结果")
+                continue
 
-        choice = response.choices[0]
-        if str(choice.finish_reason or "") == "length":
-            print("总结生成失败: 输出达到 max_tokens")
-            return ""
-        summary = (choice.message.content or "").strip()
-        if not summary:
-            print("总结生成失败: API 返回空内容")
-            return ""
-        summary = _normalize_bilingual_summary(summary)
-        if not summary or _has_unsupported_breaking_label(summary, content):
-            print("总结生成失败: 输出不符合双语要点格式或长度限制")
-            return ""
-        print(f"更新要点总结生成完成 ({len(summary)} 字符)")
-        # 用原始 content 作为缓存键，避免截断后查不到
-        translation_cache.set(content, model, summary, kind=_SUMMARY_CACHE_KIND)
-        return summary
+            choice = response.choices[0]
+            if str(choice.finish_reason or "") == "length":
+                print("总结生成失败: 输出达到 max_tokens")
+                continue
+            candidate = (choice.message.content or "").strip()
+            if not candidate:
+                print("总结生成失败: API 返回空内容")
+                continue
+            summary = _normalize_bilingual_summary(candidate)
+            if not summary or _has_unsupported_breaking_label(summary, content):
+                print("总结生成失败: 输出不符合双语要点格式或长度限制")
+                continue
+            print(f"更新要点总结生成完成 ({len(summary)} 字符)")
+            translation_cache.set(content, model, summary, kind=_SUMMARY_CACHE_KIND)
+            return summary
+        return ""
     except Exception as e:
         print(f"总结生成失败: {e}")
         if _is_fatal_error(e):

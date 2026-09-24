@@ -336,6 +336,20 @@ class SummaryFormattingTests(unittest.TestCase):
         ), "")
         cache_set.assert_not_called()
 
+    @patch("core.translate.llm.translation_cache.set")
+    @patch("core.translate.llm.translation_cache.get", return_value=None)
+    @patch("core.translate.llm.completion")
+    def test_summary_retries_invalid_format_and_caches_valid_result(
+        self, completion, _get, cache_set
+    ):
+        valid = "*Key Updates:*\n• Fixed `claude` startup.\n\n*更新要点：*\n• 修复 `claude` 启动问题。"
+        completion.side_effect = [response("unpaired summary"), response(valid)]
+
+        self.assertEqual(summarize_changelog("Fixed `claude` startup.", MODEL, API_KEY), valid)
+        self.assertEqual(completion.call_count, 2)
+        self.assertEqual(completion.call_args.kwargs["temperature"], 0)
+        cache_set.assert_called_once()
+
     def test_summary_rejects_translation_of_provider_identifier(self):
         summary = (
             "*Key Updates:*\n• Added the opencode-free zero-auth provider.\n\n"

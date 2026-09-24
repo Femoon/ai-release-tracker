@@ -190,6 +190,11 @@ Token 获取方式：GitHub Settings → Developer settings → Personal access 
 通知内容先沿用产品筛选规则，再裁剪到最多 8,000 字符。Claude Code、Codex、OpenClaw
 使用共享 Markdown 块边界裁剪，省略内容会附原文链接；Hermes 保留已有 Highlights 裁剪。
 翻译和发送使用同一份筛选后的原文。翻译或通知失败时不推进已通知版本号。
+长通知的双语摘要生成最多尝试两次（首次校验失败后重试一次），不要无限增加重试次数。
+摘要是增强内容，不是发布前提：两次仍失败时，照常发布 Telegraph，并发送标明
+“Summary unavailable / 暂无摘要”、附完整日志链接的 Telegram 降级通知。只有实际通知
+发送成功才推进版本记录；Telegraph 发布或 Telegram 发送失败仍需保留状态以便下次重试。
+降级通知目前不会自动补摘要；需要补上时应原位编辑已有消息，避免重复推送版本。
 
 ### 构建镜像
 

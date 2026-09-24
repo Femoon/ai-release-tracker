@@ -119,7 +119,7 @@ uv tool install -U hermes-agent
         self.assertIn("*中文*", combined)
         self.assertNotIn("---", combined)
 
-    @patch("core.translate.llm.summarize_changelog", return_value="")
+    @patch("core.translate.llm.summarize_changelog", return_value="*Key Updates:*\n• Fixed startup.\n\n*更新要点：*\n• 修复启动问题。")
     @patch("core.notify.telegraph.publish_changelog")
     @patch("core.notify.telegram.send_telegram_message")
     def test_highlights_link_does_not_claim_to_be_full_changelog(
@@ -146,7 +146,7 @@ uv tool install -U hermes-agent
         self.assertIn("[GitHub](https://github.com/example/release)", message)
         self.assertNotIn("Full Changelog", message)
 
-    @patch("core.translate.llm.summarize_changelog", return_value="")
+    @patch("core.translate.llm.summarize_changelog", return_value="*Key Updates:*\n• Fixed startup.\n\n*更新要点：*\n• 修复启动问题。")
     @patch("core.notify.telegraph.publish_changelog")
     @patch("core.notify.telegram.send_telegram_message")
     def test_split_telegraph_release_notes_are_not_labeled_as_highlights(
@@ -172,6 +172,47 @@ uv tool install -U hermes-agent
         self.assertIn("中文说明", message)
         self.assertNotIn("highlights", message.lower())
         self.assertNotIn("高光", message)
+
+    @patch("core.translate.llm.summarize_changelog", return_value="")
+    @patch("core.notify.telegraph.publish_changelog")
+    @patch("core.notify.telegram.send_telegram_message")
+    def test_failed_summary_still_publishes_and_sends(self, mock_send, mock_publish, _summary):
+        mock_publish.return_value = {
+            "success": True, "url": "https://telegra.ph/notes", "cn_url": None,
+        }
+        mock_send.return_value = {"success": True, "message_id": 608}
+        result = send_bilingual_notification(
+            version="2.1.281", original="x" * 5000, translated="中文" * 100,
+            title="Claude Code",
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["message_ids"], [608])
+        mock_publish.assert_called_once()
+        message = mock_send.call_args.args[0]
+        self.assertIn("Summary unavailable / 暂无摘要", message)
+        self.assertIn("https://telegra.ph/notes", message)
+
+    @patch("core.translate.llm.summarize_changelog", return_value="")
+    @patch("core.notify.telegraph.publish_changelog")
+    @patch("core.notify.telegram.edit_telegram_message")
+    def test_failed_summary_still_publishes_and_edits(self, mock_edit, mock_publish, _summary):
+        from core.notify.telegram import edit_bilingual_notification
+
+        mock_publish.return_value = {
+            "success": True, "url": "https://telegra.ph/notes", "cn_url": None,
+        }
+        mock_edit.return_value = {"success": True, "message_id": 608}
+        result = edit_bilingual_notification(
+            message_ids=[608], version="2.1.281", original="x" * 5000,
+            translated="中文" * 100, title="Claude Code",
+        )
+
+        self.assertTrue(result["success"])
+        mock_publish.assert_called_once()
+        message = mock_edit.call_args.args[1]
+        self.assertIn("Summary unavailable / 暂无摘要", message)
+        self.assertIn("https://telegra.ph/notes", message)
 
 
 if __name__ == "__main__":
