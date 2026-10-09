@@ -1,269 +1,121 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+本文件为在此仓库中工作的编码 agent 提供指引。面向用户的安装说明见 `README.md` / `README_CN.md`。
 
 ## 项目概述
 
-版本更新监控工具集，用于检查 AI 编码工具的新版本发布。
+监控 AI 编码工具（Claude Code、OpenAI Codex、OpenClaw、Hermes Agent）的新版本发布，
+将更新日志翻译成中文后推送到 Telegram 公开频道。Python >= 3.14，使用 uv 管理依赖。
 
-## 运行脚本
-
-```bash
-# 运行入口文件，检查所有工具的版本更新
-uv run python main.py
-
-# 单独检查 Claude Code 版本更新
-uv run python products/claude_code/checker.py
-uv run python products/claude_code/checker.py --force              # 强制推送最新版本（测试用，不更新记录）
-uv run python products/claude_code/checker.py --force -V 2.1.49   # 强制推送指定版本（测试用）
-
-# 单独检查 OpenAI Codex 版本更新（排除 alpha 版本）
-uv run python products/codex/checker.py
-uv run python products/codex/checker.py --force        # 强制推送最新版本（测试用，不更新记录）
-uv run python products/codex/checker.py --force -V 0.149.0  # 强制推送指定版本（通过 API 按 tag 获取，测试用）
-
-# 批量推送 Claude Code 历史版本到 Telegram（默认推送 3 个）
-uv run python products/claude_code/pusher.py
-uv run python products/claude_code/pusher.py --count 5  # 推送 5 个
-uv run python products/claude_code/pusher.py --all       # 推送所有未推送版本
-
-# 批量推送 OpenAI Codex 历史版本到 Telegram
-uv run python products/codex/pusher.py
-
-# 获取 OpenAI Codex 所有 releases 信息
-uv run python products/codex/fetcher.py
-
-# 单独检查 OpenClaw 版本更新（排除 beta 版本）
-uv run python products/openclaw/checker.py
-uv run python products/openclaw/checker.py --force              # 强制推送最新版本（测试用，不更新记录）
-uv run python products/openclaw/checker.py --force -V 2026.3.12 # 强制推送指定版本（测试用）
-
-# 批量推送 OpenClaw 历史版本到 Telegram
-uv run python products/openclaw/pusher.py
-uv run python products/openclaw/pusher.py --count 5  # 推送 5 个
-uv run python products/openclaw/pusher.py --all       # 推送所有未推送版本
-
-# 获取 OpenClaw 所有版本信息
-uv run python products/openclaw/fetcher.py
-
-# 单独检查 Hermes Agent 版本更新
-uv run python products/hermes/checker.py
-uv run python products/hermes/checker.py --force  # 强制推送最新版本（不更新记录）
-
-# 批量推送 Hermes Agent 历史版本到 Telegram
-uv run python products/hermes/pusher.py
-uv run python products/hermes/pusher.py --count 5
-uv run python products/hermes/pusher.py --all
-uv run python products/hermes/pusher.py --dry-run --all
+```
+main.py              依次以子进程运行 4 个 checker，任一失败则非零退出
+core/
+  notify/            telegram.py（双语消息、编辑）、telegraph.py（长文发布）
+  translate/         llm.py（翻译与摘要）、policy.py（placeholder 保护与校验）、cache.py
+  state/             message_state.py（已发送消息 ID、内容 hash、编辑次数）
+  utils/             clean.py（release body 清洗）、content.py（通知内容裁剪）
+products/<name>/
+  checker.py         定时检查最新版本并推送（生产入口）
+  pusher.py          手动批量补推历史版本
+  fetcher.py         导出全部版本到 output/（codex、openclaw）
+  其他               产品专属的数据源与内容筛选（releases.py、source.py、content.py）
+output/              运行时状态与翻译缓存，不入库
 ```
 
-## 依赖
-
-**环境要求：** Python >= 3.14
+## 常用命令
 
 ```bash
-# 安装 uv（如未安装）
-# 参考：https://docs.astral.sh/uv/getting-started/installation/
-# macOS/Linux:
-curl -LsSf https://astral.sh/uv/install.sh | sh
-# Windows:
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+uv sync                                           # 安装依赖
+uv run python -m unittest discover -s tests       # 运行全部测试
+uv run python main.py                             # 检查所有产品
 
-# 安装项目依赖
-uv sync
+uv run python products/<name>/checker.py          # 检查单个产品
+uv run python products/<name>/checker.py --force  # 强制推送最新版本，不更新记录
+uv run python products/<name>/checker.py --force -V <version>  # 强制推送指定版本（hermes 不支持 -V）
+
+uv run python products/<name>/pusher.py           # 补推未推送的历史版本，默认 3 个
+uv run python products/<name>/pusher.py --count 5 / --all
+uv run python products/hermes/pusher.py --dry-run --all   # 只检查裁剪结果，不翻译不发送
+uv run python products/hermes/pusher.py --tag <tag> / --edit-tag <tag> / --edit-all
 ```
 
-不使用 uv 时：`pip install .`，然后用 `python` 代替 `uv run python`。
+`codex/pusher.py` 读取 `output/codex_releases.txt`，需先运行 `codex/fetcher.py`。
 
-## 架构
+**`--force` 和 pusher 会真实发送到配置的频道。** 本地 `.env` 若配置了生产 bot，
+测试时先清空对应的 `*_BOT_TOKEN`，或只调用翻译函数而不走发送路径。
 
-版本检查脚本逻辑：
-1. 从远程获取版本信息（CHANGELOG.md 或 Atom feed）
-2. 解析最新版本号和更新内容
-3. 与本地 `output/*_latest_version.txt` 对比
-4. 版本变化时打印更新内容并更新本地记录
-5. 使用 AI 翻译更新内容（通过 openai SDK 调用 OpenAI 兼容接口，默认 OpenRouter）
-6. 发送双语 Telegram 通知（英文原文 + 中文翻译）
+## 数据流
 
-| 脚本 | 数据源 | 版本记录文件 |
-|------|--------|--------------|
-| products/claude_code/checker.py | GitHub CHANGELOG.md | output/claude_code_latest_version.txt |
-| products/codex/checker.py | GitHub releases Atom feed | output/codex_latest_version.txt |
-| products/openclaw/checker.py | GitHub CHANGELOG.md | output/openclaw_latest_version.txt |
-| products/hermes/checker.py | GitHub Releases API（Atom 备用） | output/hermes_latest_version.txt |
+checker 流程：获取最新稳定版本 → 与 `output/<name>_latest_version.txt` 比对 →
+按产品规则筛选内容并裁剪 → 翻译 → 发送 Telegram（超长则发布 Telegraph）→
+**发送成功后**才写入版本记录和消息状态。
 
-历史推送脚本 `products/claude_code/pusher.py` 会记录已推送版本到 `output/claude_code_pushed_versions.txt`，避免重复推送。
+| 产品 | 数据源 | 稳定版判定 |
+|------|--------|-----------|
+| Claude Code | GitHub raw `CHANGELOG.md` | CHANGELOG 中最新的 `## x.y.z` |
+| Codex | Releases Atom feed，逐个用 Releases API 校验 | 仅 `rust-vX.Y.Z` 且非 draft/prerelease；按版本号而非发布顺序取最大 |
+| OpenClaw | Releases API；拆分的 `CHANGELOG/<version>.md` | 已发布、非 prerelease；内容标为 unreleased/beta 时拒绝 |
+| Hermes | Releases API（Atom 备用） | 稳定 CalVer tag |
+
+已发送版本若 release notes 后续变化，checker 会原位编辑已有消息，每个版本最多编辑
+`MAX_EDITS_PER_VERSION` 次（`core/state/message_state.py`）。
+
+## 不变量与约定
+
+修改相关代码时必须保持：
+
+- **状态只在成功后推进。** 翻译失败、Telegraph 发布失败或 Telegram 发送失败时，不写版本记录，
+  由下一轮 cron 重试。回退或误写状态会导致公开频道重复推送。
+- **翻译和发送使用同一份原文。** 先按产品规则筛选，再用 `limit_notification_content` 裁剪到
+  8,000 字符以内（Claude Code、Codex、OpenClaw 按 Markdown 块边界裁剪并附原文链接；
+  Hermes 使用自己的 Highlights 裁剪）。
+- **翻译质量门槛不放松。** 译文需通过 placeholder 校验和中文占比检查；不合格时宁可不发送，
+  也不推送英文或残缺译文。
+- **LLM 调用次数有上限。** 翻译最多 3 次调用（首次 + 一次完整重试 + 一次定向修复）；
+  长通知摘要最多 2 次。openai SDK 的自动重试保持关闭（`max_retries=0`），不要增加重试层。
+- **摘要不是发布前提。** 两次都失败时照常发布 Telegraph，发送标明
+  "Summary unavailable / 暂无摘要"并附完整日志链接的降级通知。降级通知不会自动补摘要；
+  需要补时原位编辑已有消息，不要重新推送。
+- **重量级依赖延迟导入。** 不要在模块顶层导入 `openai`；无新版本的检查轮次不应加载它。
+  生产机器较慢，顶层导入会让每轮检查多出数秒。
+- **`output/` 不入库**，包括版本记录、推送状态和翻译缓存。
+- 测试使用 `unittest`，LLM 调用通过 `patch("core.translate.llm.completion")` mock。
+
+## 配置
+
+所有环境变量及示例值见 `.env.example`。首次运行（无版本记录）只写入当前版本，不推送。
+
+| 变量 | 用途 | 未配置时 |
+|------|------|---------|
+| `<PRODUCT>_BOT_TOKEN` / `<PRODUCT>_CHAT_ID` | 各产品的 Telegram bot 与频道（`CLAUDE_CODE`、`CODEX`、`OPENCLAW`、`HERMES`） | Hermes 跳过翻译和通知；其他产品发现新版本时发送失败、不推进状态、checker 非零退出 |
+| `LLM_API_KEY` / `LLM_MODEL` | 翻译模型。`LLM_MODEL` 沿用 `openrouter/<vendor>/<model>` 写法，发送时去掉 `openrouter/` 前缀 | 视为翻译失败：不推送英文原文、不推进状态、checker 非零退出 |
+| `LLM_BASE_URL` | OpenAI 兼容端点，默认 OpenRouter | — |
+| `LLM_PROVIDER_ONLY` | 固定 OpenRouter provider（逗号分隔），降低翻译质量方差 | 不限制路由 |
+| `LLM_REASONING_EFFORT` | 默认 `none`；强制思考的模型（如 GLM）需设为 `minimal` | — |
+| `LLM_TIMEOUT` | 单次 LLM 请求超时秒数，默认 300 | — |
+| `TELEGRAPH_ACCESS_TOKEN` | 超过 Telegram 4,096 字符时发布长文 | 超长消息发送失败 |
+| `TELEGRAPH_AUTHOR_NAME` / `TELEGRAPH_AUTHOR_URL` | Telegraph 文章署名 | 使用默认署名 |
+| `GH_TOKEN` | GitHub API 认证（Codex、OpenClaw、Hermes），速率上限 60 → 5,000 次/小时 | 匿名访问，易被限流 |
+
+`LLM_PROVIDER_ONLY` 和 reasoning 参数是 OpenRouter 扩展，换用其他端点时需按对方文档调整。
+不要使用 `GITHUB_TOKEN` 作为变量名（GitHub Actions 保留变量）。
+
+公开频道：[Claude Code](https://t.me/claude_code_push)、[OpenAI Codex](https://t.me/codex_push)、
+[OpenClaw](https://t.me/openclaw_push)；Hermes Agent 暂未配置频道。
+
+## 生产环境与部署
+
+- 生产主机、路径、日志位置等环境细节记录在 `AGENTS.local.md`（不入库）。若该文件存在，
+  执行部署或排查生产问题前先阅读它。生产环境细节只写入该文件，不要写进本文件、docs 或提交信息。
+- 生产以 Docker 运行：宿主机 cron 每 30 分钟执行 `docker compose build` 和
+  `docker compose run --rm version-checker`，外层用 `flock` 防止重叠；
+  状态通过 `./output:/app/output` 持久化，配置来自服务器上的 `.env`。
+- 部署使用 `scripts/deploy.sh`：运行测试 → rsync 同步代码 → 重建镜像并验证导入。
+  目标读取自 `.deploy.env`（不入库，参考 `.deploy.env.example`）。可先用 `--dry-run` 核对同步列表。
+- 服务器目录不是 git 仓库，不要在服务器上直接修改代码。部署必须保留服务器的 `.env` 和 `output/`。
+- 本地修改不等于生产已部署。
 
 ## GitHub Actions
 
-项目配置了自动版本检查（`.github/workflows/version-check.yml`）：
-- 每 30 分钟自动运行
-- 检测到新版本时自动提交版本记录更新
-- 需配置 Repository Secrets: `CLAUDE_CODE_BOT_TOKEN`, `CLAUDE_CODE_CHAT_ID`, `CODEX_BOT_TOKEN`, `CODEX_CHAT_ID`, `OPENCLAW_BOT_TOKEN`, `OPENCLAW_CHAT_ID`, `LLM_API_KEY`
-
-## Telegram 通知配置
-
-每个工具使用独立的环境变量，可推送到不同的 bot 和频道：
-
-公开频道：
-- Claude Code: https://t.me/claude_code_push
-- OpenAI Codex: https://t.me/codex_push
-- OpenClaw: https://t.me/openclaw_push
-- Hermes Agent: 暂未配置
-
-```bash
-# Claude Code 通知配置
-export CLAUDE_CODE_BOT_TOKEN="your_claude_code_bot_token"
-export CLAUDE_CODE_CHAT_ID="your_claude_code_chat_id"
-
-# OpenAI Codex 通知配置
-export CODEX_BOT_TOKEN="your_codex_bot_token"
-export CODEX_CHAT_ID="your_codex_chat_id"
-
-# OpenClaw 通知配置
-export OPENCLAW_BOT_TOKEN="your_openclaw_bot_token"
-export OPENCLAW_CHAT_ID="your_openclaw_chat_id"
-
-# Hermes Agent 通知配置（频道暂未创建，默认留空）
-export HERMES_BOT_TOKEN=""
-export HERMES_CHAT_ID=""
-```
-
-未配置时脚本正常运行，仅跳过通知功能。
-
-## AI 翻译配置
-
-使用 openai SDK 调用 OpenAI 兼容的 Chat Completions 接口（默认 OpenRouter）进行更新内容翻译，通知会显示英文原文和中文翻译。`LLM_MODEL` 沿用 `openrouter/<vendor>/<model>` 写法，发送时去掉 `openrouter/` 前缀。openai 在调用时才懒加载，SDK 自身重试已关闭（`max_retries=0`），重试次数完全由翻译流程控制：
-
-```bash
-export LLM_API_KEY="your_llm_api_key"
-export LLM_MODEL="openrouter/z-ai/glm-5.3-flash"
-
-# 可选：固定 OpenRouter provider（逗号分隔），避免多 provider 路由导致的翻译质量方差
-export LLM_PROVIDER_ONLY="z-ai"
-
-# 可选：reasoning effort，默认 none（关闭思考）；强制思考的模型（如 GLM）需设为 minimal
-export LLM_REASONING_EFFORT="minimal"
-
-# 可选：单次 LLM 请求超时秒数，默认 300（过长会拖过 30 分钟 cron 周期）
-export LLM_TIMEOUT="300"
-
-# 可选：OpenAI 兼容端点，默认 https://openrouter.ai/api/v1
-# 非 OpenRouter 端点不支持 LLM_PROVIDER_ONLY / reasoning 扩展参数
-export LLM_BASE_URL="https://openrouter.ai/api/v1"
-```
-
-未配置时跳过翻译，仅发送英文原文。
-
-## Telegraph 长文发布配置（可选）
-
-当更新日志内容超过 Telegram 消息长度限制（4096字符）时，系统会自动将内容发布到 Telegraph，并在 Telegram 发送文章链接。
-
-```bash
-# Telegraph 配置（必需，用于发布长文）
-export TELEGRAPH_ACCESS_TOKEN="your_telegraph_token"
-
-# 可选：自定义文章署名
-export TELEGRAPH_AUTHOR_NAME="AI Release Tracker"
-export TELEGRAPH_AUTHOR_URL="https://t.me/your_channel"
-```
-
-未配置时跳过 Telegraph 发布，超长消息将发送失败。
-
-## GitHub API 配置（可选）
-
-用于 codex checker 和 fetcher 访问 GitHub API，避免速率限制：
-
-```bash
-export GH_TOKEN="your_github_token"
-```
-
-**注意**：不要使用 `GITHUB_TOKEN`，这是 GitHub Actions 的保留变量名。
-
-未配置时脚本仍可运行，但可能遇到速率限制（60 次/小时）。配置后提升至 5000 次/小时。
-
-Token 获取方式：GitHub Settings → Developer settings → Personal access tokens → 创建 token（无需特殊权限，public_repo 访问即可）。
-
-## Docker 部署
-
-### 生产环境与部署
-
-- 生产主机、路径、日志位置等环境细节记录在 `AGENTS.local.md`（不入库）。若该文件存在，
-  执行部署或排查生产问题前先阅读它。
-- 宿主机 cron 每 30 分钟构建镜像并运行 `docker compose run --rm version-checker`，
-  外层用 `flock` 防止重叠；状态通过 `./output:/app/output` 持久化。
-- 部署使用 `scripts/deploy.sh`：rsync 同步代码后重建镜像，目标读取自 `.deploy.env`
-  （不入库，参考 `.deploy.env.example`）。可先用 `--dry-run` 核对同步列表。
-- 服务器目录不是 git 仓库；不要在服务器上直接修改代码。
-- `output/` 中的版本和推送状态全部不入库，只存在于运行环境；部署必须保留远程 `.env`、
-  `output/` 和已有运行状态，回退状态会导致重复推送。
-- 本地修改不等于生产已部署。
-
-通知内容先沿用产品筛选规则，再裁剪到最多 8,000 字符。Claude Code、Codex、OpenClaw
-使用共享 Markdown 块边界裁剪，省略内容会附原文链接；Hermes 保留已有 Highlights 裁剪。
-翻译和发送使用同一份筛选后的原文。翻译或通知失败时不推进已通知版本号。
-长通知的双语摘要生成最多尝试两次（首次校验失败后重试一次），不要无限增加重试次数。
-摘要是增强内容，不是发布前提：两次仍失败时，照常发布 Telegraph，并发送标明
-“Summary unavailable / 暂无摘要”、附完整日志链接的 Telegram 降级通知。只有实际通知
-发送成功才推进版本记录；Telegraph 发布或 Telegram 发送失败仍需保留状态以便下次重试。
-降级通知目前不会自动补摘要；需要补上时应原位编辑已有消息，避免重复推送版本。
-
-### 构建镜像
-
-```bash
-docker compose build
-```
-
-### 手动运行一次
-
-```bash
-docker compose run --rm version-checker
-```
-
-### 配置定时任务
-
-推荐使用宿主机 cron 定时调用容器（资源消耗最低）：
-
-```bash
-# 编辑 crontab
-crontab -e
-
-# 每小时检查一次
-0 * * * * cd /path/to/ai-release-tracker && docker compose run --rm version-checker >> /var/log/ai-release-tracker.log 2>&1
-```
-
-### 配置 Telegram 通知
-
-创建 `.env` 文件：
-
-```bash
-# Claude Code 通知配置
-CLAUDE_CODE_BOT_TOKEN=your_claude_code_bot_token
-CLAUDE_CODE_CHAT_ID=your_claude_code_chat_id
-
-# OpenAI Codex 通知配置
-CODEX_BOT_TOKEN=your_codex_bot_token
-CODEX_CHAT_ID=your_codex_chat_id
-
-# OpenClaw 通知配置
-OPENCLAW_BOT_TOKEN=your_openclaw_bot_token
-OPENCLAW_CHAT_ID=your_openclaw_chat_id
-
-# AI 翻译配置
-LLM_API_KEY=your_llm_api_key
-LLM_MODEL=openrouter/z-ai/glm-5.3-flash
-# 可选：固定 OpenRouter provider，降低翻译质量方差
-LLM_PROVIDER_ONLY=z-ai
-# 可选：reasoning effort（GLM 强制思考，需 minimal）
-LLM_REASONING_EFFORT=minimal
-# 可选：单次 LLM 请求超时秒数，默认 300
-# LLM_TIMEOUT=300
-# 可选：OpenAI 兼容端点，默认 OpenRouter
-# LLM_BASE_URL=https://openrouter.ai/api/v1
-
-# GitHub API 配置（可选，避免 API 速率限制）
-# 注意：不要使用 GITHUB_TOKEN（GitHub Actions 保留变量）
-# GH_TOKEN=your_github_token
-```
-
-docker-compose 会自动读取 `.env` 文件。
+`.github/workflows/version-check.yml` 已在 GitHub 上手动停用，生产只依赖服务器 cron。
+该 workflow 会把 `output/` 变更提交回仓库，与"`output/` 不入库"冲突；重新启用前需先改造状态持久化方式。
