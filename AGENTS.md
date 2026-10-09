@@ -1,7 +1,3 @@
-# AGENTS.md
-
-本文件为在此仓库中工作的编码 agent 提供指引。面向用户的安装说明见 `README.md` / `README_CN.md`。
-
 ## 项目概述
 
 监控 AI 编码工具（Claude Code、OpenAI Codex、OpenClaw、Hermes Agent）的新版本发布，
