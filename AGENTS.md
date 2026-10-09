@@ -144,6 +144,9 @@ export LLM_PROVIDER_ONLY="z-ai"
 
 # 可选：reasoning effort，默认 none（关闭思考）；强制思考的模型（如 GLM）需设为 minimal
 export LLM_REASONING_EFFORT="minimal"
+
+# 可选：单次 LLM 请求超时秒数，默认 300（LiteLLM 默认 600，会拖过 cron 周期）
+export LLM_TIMEOUT="300"
 ```
 
 未配置时跳过翻译，仅发送英文原文。
@@ -244,6 +247,8 @@ LLM_MODEL=openrouter/z-ai/glm-5.3-flash
 LLM_PROVIDER_ONLY=z-ai
 # 可选：reasoning effort（GLM 强制思考，需 minimal）
 LLM_REASONING_EFFORT=minimal
+# 可选：单次 LLM 请求超时秒数，默认 300
+# LLM_TIMEOUT=300
 
 # GitHub API 配置（可选，避免 API 速率限制）
 # 注意：不要使用 GITHUB_TOKEN（GitHub Actions 保留变量）

@@ -7,7 +7,6 @@
 import json
 import os
 import re
-from litellm import completion
 
 from core.translate import cache as translation_cache
 from core.translate.policy import (
@@ -58,6 +57,24 @@ _REPAIR_MAX_LINES = 12
 # 时只保留前面部分（通常包含 Highlights / Breaking / New Features 等高价值段落），
 # 避免把 70k+ 字符的 changelog 整个塞给 LLM 浪费输入 token
 _SUMMARIZE_INPUT_TRUNCATE_CHARS = 24000
+# 单次 LLM 请求超时（秒）。LiteLLM 默认 600 秒，一次流程最多 5 次调用，
+# 挂起时会拖过 30 分钟的 cron 周期；可通过 LLM_TIMEOUT 覆盖
+_DEFAULT_LLM_TIMEOUT = 300
+
+
+def _llm_timeout() -> float:
+    try:
+        return float(os.getenv("LLM_TIMEOUT", "") or _DEFAULT_LLM_TIMEOUT)
+    except ValueError:
+        return _DEFAULT_LLM_TIMEOUT
+
+
+def completion(**kwargs):
+    """懒加载 LiteLLM（import 约 1 秒），无新版本的检查轮次无需加载。"""
+    from litellm import completion as litellm_completion
+
+    kwargs.setdefault("timeout", _llm_timeout())
+    return litellm_completion(**kwargs)
 _SUMMARY_MAX_PAIRS = 6
 _SUMMARY_MAX_CHARS = 1800
 
