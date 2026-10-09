@@ -186,13 +186,18 @@ Token 获取方式：GitHub Settings → Developer settings → Personal access 
 
 ## Docker 部署
 
-### 实际生产环境（2026-09-05 核实）
+### 生产环境与部署
 
-- SSH 别名：`rn-vps`；仓库：`/opt/ai-release-tracker`。
-- 宿主机 cron 每 30 分钟构建镜像并运行 `docker compose run --rm version-checker`。
-- 日志：`/var/log/ai-tracker.log`；状态通过 `./output:/app/output` 持久化。
-- `output/` 中版本和消息状态不提交 Git 是预期设计；不要为了 CI 改动忽略规则。
-- 本地修改不等于生产已部署；发布时需保留远程 `.env`、`output/` 和已有运行状态。
+- 生产主机、路径、日志位置等环境细节记录在 `AGENTS.local.md`（不入库）。若该文件存在，
+  执行部署或排查生产问题前先阅读它。
+- 宿主机 cron 每 30 分钟构建镜像并运行 `docker compose run --rm version-checker`，
+  外层用 `flock` 防止重叠；状态通过 `./output:/app/output` 持久化。
+- 部署使用 `scripts/deploy.sh`：rsync 同步代码后重建镜像，目标读取自 `.deploy.env`
+  （不入库，参考 `.deploy.env.example`）。可先用 `--dry-run` 核对同步列表。
+- 服务器目录不是 git 仓库；不要在服务器上直接修改代码。
+- `output/` 中的版本和推送状态全部不入库，只存在于运行环境；部署必须保留远程 `.env`、
+  `output/` 和已有运行状态，回退状态会导致重复推送。
+- 本地修改不等于生产已部署。
 
 通知内容先沿用产品筛选规则，再裁剪到最多 8,000 字符。Claude Code、Codex、OpenClaw
 使用共享 Markdown 块边界裁剪，省略内容会附原文链接；Hermes 保留已有 Highlights 裁剪。

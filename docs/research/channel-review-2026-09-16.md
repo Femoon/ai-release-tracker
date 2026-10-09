@@ -48,5 +48,5 @@
 旧文章 https://telegra.ph/Claude-Code-210-Released-01-08 不属于当前 Telegraph 账号，无法原地编辑。
 原文保持不变；关联 Telegram 消息 379 已补官方来源链接。未创建替代文章或通知。
 
-修复已同步至 `rn-vps:/opt/ai-release-tracker` 并重建镜像，保留 `.env`、`output/` 及运行状态。
+修复已同步至生产服务器并重建镜像，保留 `.env`、`output/` 及运行状态。
 本轮未向 WSL 同步源码。
