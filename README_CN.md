@@ -24,7 +24,7 @@ AI 编码工具版本更新监控工具。自动检查新版本发布，并发�
 
 - 监控多个 AI 编码工具的版本更新
 - 从 GitHub 解析更新日志（CHANGELOG.md 或 Atom feed）
-- 使用 LiteLLM 进行 AI 翻译（支持多种 provider）
+- 通过任意 OpenAI 兼容接口进行 AI 翻译（默认 OpenRouter）
 - 双语 Telegram 通知
 - GitHub Actions 每 30 分钟自动检查
 - 支持 Docker 部署
@@ -176,7 +176,7 @@ docker-compose 会自动读取项目根目录的 `.env` 文件。
 2. 解析最新版本号和更新内容
 3. 与本地 `output/*_latest_version.txt` 对比
 4. 版本变化时打印更新内容并更新本地记录
-5. 使用 AI 翻译更新内容（通过 LiteLLM）
+5. 使用 AI 翻译更新内容（通过 openai SDK）
 6. 发送双语 Telegram 通知
 
 ## 许可证

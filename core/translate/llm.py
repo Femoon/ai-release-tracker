@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-翻译模块 - 使用 LiteLLM 调用 LLM API 进行翻译
+翻译模块 - 通过 OpenAI 兼容接口调用 LLM 进行翻译
 """
 
+import functools
 import json
 import os
 import re
@@ -43,7 +44,7 @@ _FATAL_ERROR_KEYWORDS = (
     "blocked",
 )
 
-# 显式给 LiteLLM completion 设置输出上限，避免 OpenRouter 默认 65536 触发
+# 显式给 completion 设置输出上限，避免 OpenRouter 默认 65536 触发
 # "requires more credits / fewer max_tokens" 402 错误
 _TRANSLATE_MIN_TOKENS = 8192
 _TRANSLATE_MAX_TOKENS = 32768
@@ -57,9 +58,19 @@ _REPAIR_MAX_LINES = 12
 # 时只保留前面部分（通常包含 Highlights / Breaking / New Features 等高价值段落），
 # 避免把 70k+ 字符的 changelog 整个塞给 LLM 浪费输入 token
 _SUMMARIZE_INPUT_TRUNCATE_CHARS = 24000
-# 单次 LLM 请求超时（秒）。LiteLLM 默认 600 秒，一次流程最多 5 次调用，
-# 挂起时会拖过 30 分钟的 cron 周期；可通过 LLM_TIMEOUT 覆盖
+_SUMMARY_MAX_PAIRS = 6
+_SUMMARY_MAX_CHARS = 1800
+# 单次 LLM 请求超时（秒）。一次流程最多 5 次调用，挂起时会拖过 30 分钟的
+# cron 周期；可通过 LLM_TIMEOUT 覆盖
 _DEFAULT_LLM_TIMEOUT = 300
+# 任意 OpenAI 兼容 Chat Completions 端点均可通过 LLM_BASE_URL 切换
+_DEFAULT_LLM_BASE_URL = "https://openrouter.ai/api/v1"
+# 兼容 LiteLLM 时期的 LLM_MODEL 写法（openrouter/<vendor>/<model>）
+_LEGACY_MODEL_PREFIX = "openrouter/"
+
+
+class LLMError(Exception):
+    """LLM 接口返回错误。消息包含响应内容，供 _is_fatal_error 匹配。"""
 
 
 def _llm_timeout() -> float:
@@ -69,14 +80,34 @@ def _llm_timeout() -> float:
         return _DEFAULT_LLM_TIMEOUT
 
 
-def completion(**kwargs):
-    """懒加载 LiteLLM（import 约 1 秒），无新版本的检查轮次无需加载。"""
-    from litellm import completion as litellm_completion
+def _llm_base_url() -> str:
+    return (os.getenv("LLM_BASE_URL", "").strip() or _DEFAULT_LLM_BASE_URL).rstrip("/")
 
-    kwargs.setdefault("timeout", _llm_timeout())
-    return litellm_completion(**kwargs)
-_SUMMARY_MAX_PAIRS = 6
-_SUMMARY_MAX_CHARS = 1800
+
+def _api_model_name(model: str) -> str:
+    return model.removeprefix(_LEGACY_MODEL_PREFIX)
+
+
+@functools.lru_cache(maxsize=4)
+def _client(base_url: str, api_key: str):
+    # 懒加载：openai 导入在 2 核生产机上约 4 秒，无新版本的检查轮次无需加载。
+    # max_retries=0：重试由调用方按校验结果控制，避免 SDK 重试放大调用次数和费用
+    from openai import OpenAI
+
+    return OpenAI(base_url=base_url, api_key=api_key, max_retries=0)
+
+
+def completion(*, model: str, api_key: str, **params):
+    """调用 OpenAI 兼容的 Chat Completions 接口，LLM_BASE_URL 可切换端点。"""
+    params.setdefault("timeout", _llm_timeout())
+    response = _client(_llm_base_url(), api_key).chat.completions.create(
+        model=_api_model_name(model), **params
+    )
+    # OpenRouter 在上游 provider 出错时可能以 200 返回 error 对象
+    if error := getattr(response, "error", None):
+        raise LLMError(f"接口返回错误: {error}")
+    return response
+
 
 _TRANSLATION_SYSTEM_PROMPT = """你是技术软件更新日志翻译器。只输出中文译文，不输出解释。
 

@@ -82,7 +82,7 @@ uv sync
 2. 解析最新版本号和更新内容
 3. 与本地 `output/*_latest_version.txt` 对比
 4. 版本变化时打印更新内容并更新本地记录
-5. 使用 AI 翻译更新内容（通过 LiteLLM 调用 LLM API）
+5. 使用 AI 翻译更新内容（通过 openai SDK 调用 OpenAI 兼容接口，默认 OpenRouter）
 6. 发送双语 Telegram 通知（英文原文 + 中文翻译）
 
 | 脚本 | 数据源 | 版本记录文件 |
@@ -133,7 +133,7 @@ export HERMES_CHAT_ID=""
 
 ## AI 翻译配置
 
-使用 LiteLLM 调用 LLM API 进行更新内容翻译，通知会显示英文原文和中文翻译：
+使用 openai SDK 调用 OpenAI 兼容的 Chat Completions 接口（默认 OpenRouter）进行更新内容翻译，通知会显示英文原文和中文翻译。`LLM_MODEL` 沿用 `openrouter/<vendor>/<model>` 写法，发送时去掉 `openrouter/` 前缀。openai 在调用时才懒加载，SDK 自身重试已关闭（`max_retries=0`），重试次数完全由翻译流程控制：
 
 ```bash
 export LLM_API_KEY="your_llm_api_key"
@@ -145,8 +145,12 @@ export LLM_PROVIDER_ONLY="z-ai"
 # 可选：reasoning effort，默认 none（关闭思考）；强制思考的模型（如 GLM）需设为 minimal
 export LLM_REASONING_EFFORT="minimal"
 
-# 可选：单次 LLM 请求超时秒数，默认 300（LiteLLM 默认 600，会拖过 cron 周期）
+# 可选：单次 LLM 请求超时秒数，默认 300（过长会拖过 30 分钟 cron 周期）
 export LLM_TIMEOUT="300"
+
+# 可选：OpenAI 兼容端点，默认 https://openrouter.ai/api/v1
+# 非 OpenRouter 端点不支持 LLM_PROVIDER_ONLY / reasoning 扩展参数
+export LLM_BASE_URL="https://openrouter.ai/api/v1"
 ```
 
 未配置时跳过翻译，仅发送英文原文。
@@ -249,6 +253,8 @@ LLM_PROVIDER_ONLY=z-ai
 LLM_REASONING_EFFORT=minimal
 # 可选：单次 LLM 请求超时秒数，默认 300
 # LLM_TIMEOUT=300
+# 可选：OpenAI 兼容端点，默认 OpenRouter
+# LLM_BASE_URL=https://openrouter.ai/api/v1
 
 # GitHub API 配置（可选，避免 API 速率限制）
 # 注意：不要使用 GITHUB_TOKEN（GitHub Actions 保留变量）

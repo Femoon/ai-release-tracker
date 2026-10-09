@@ -1,7 +1,10 @@
+import threading
 import unittest
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from core.translate import llm
 from core.translate.llm import _normalize_bilingual_summary, _translation_max_tokens, summarize_changelog, translate_changelog
 from core.translate.policy import protect
 
@@ -392,6 +395,89 @@ class SummaryFormattingTests(unittest.TestCase):
 
         self.assertEqual(_normalize_bilingual_summary(summary), "")
 
+
+class CompletionClientTests(unittest.TestCase):
+    def setUp(self):
+        llm._client.cache_clear()
+        self.addCleanup(llm._client.cache_clear)
+
+    @patch.dict("os.environ", {"LLM_BASE_URL": "", "LLM_TIMEOUT": ""})
+    @patch("openai.OpenAI")
+    def test_defaults_to_openrouter_without_sdk_retries(self, openai_cls):
+        create = openai_cls.return_value.chat.completions.create
+        create.return_value = response("ok")
+
+        result = llm.completion(
+            model=MODEL, api_key=API_KEY, messages=[], extra_body={"reasoning": {"effort": "none"}}
+        )
+
+        self.assertEqual(result.choices[0].message.content, "ok")
+        openai_cls.assert_called_once_with(
+            base_url="https://openrouter.ai/api/v1", api_key=API_KEY, max_retries=0
+        )
+        kwargs = create.call_args.kwargs
+        self.assertEqual(kwargs["model"], "deepseek/deepseek-v4-flash-0731")
+        self.assertEqual(kwargs["timeout"], 300)
+        self.assertEqual(kwargs["extra_body"], {"reasoning": {"effort": "none"}})
+
+    @patch.dict("os.environ", {"LLM_BASE_URL": "https://api.deepseek.com/v1/", "LLM_TIMEOUT": "60"})
+    @patch("openai.OpenAI")
+    def test_base_url_and_timeout_are_configurable(self, openai_cls):
+        create = openai_cls.return_value.chat.completions.create
+        create.return_value = response("ok")
+
+        llm.completion(model="deepseek-chat", api_key=API_KEY, messages=[])
+        llm.completion(model="deepseek-chat", api_key=API_KEY, messages=[])
+
+        openai_cls.assert_called_once_with(
+            base_url="https://api.deepseek.com/v1", api_key=API_KEY, max_retries=0
+        )
+        self.assertEqual(create.call_args.kwargs["model"], "deepseek-chat")
+        self.assertEqual(create.call_args.kwargs["timeout"], 60.0)
+
+    @patch("openai.OpenAI")
+    def test_error_object_in_ok_response_raises(self, openai_cls):
+        openai_cls.return_value.chat.completions.create.return_value = SimpleNamespace(
+            error={"code": 402, "message": "Insufficient credits"}, choices=None
+        )
+
+        with self.assertRaises(llm.LLMError) as ctx:
+            llm.completion(model=MODEL, api_key=API_KEY, messages=[])
+        self.assertTrue(llm._is_fatal_error(ctx.exception))
+
+    def test_http_status_errors_are_classified_end_to_end(self):
+        """真实走一遍 SDK 的 HTTP 和异常路径，确认致命错误判定仍然生效。"""
+        status_code, message = 402, b""
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                self.rfile.read(int(self.headers["Content-Length"]))
+                body = b'{"error": {"code": %d, "message": "%s"}}' % (status_code, message)
+                self.send_response(status_code)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *args):
+                pass
+
+        server = HTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        base_url = f"http://127.0.0.1:{server.server_port}/v1"
+
+        for status_code, message, fatal in (
+            (402, b"Insufficient credits", True),
+            (503, b"Service temporarily unavailable", False),
+        ):
+            with self.subTest(status=status_code), patch.dict(
+                "os.environ", {"LLM_BASE_URL": base_url, "LLM_TIMEOUT": "5"}
+            ):
+                with self.assertRaises(Exception) as ctx:
+                    llm.completion(model=MODEL, api_key=API_KEY, messages=[])
+                self.assertEqual(llm._is_fatal_error(ctx.exception), fatal, str(ctx.exception))
 
 if __name__ == "__main__":
     unittest.main()

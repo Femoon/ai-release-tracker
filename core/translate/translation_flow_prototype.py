@@ -21,12 +21,13 @@ from typing import Any
 
 import requests
 from dotenv import load_dotenv
-from litellm import completion
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 load_dotenv(PROJECT_ROOT / ".env")
+
+from core.translate.llm import completion  # noqa: E402
 
 CHANGELOG_URL = (
     "https://raw.githubusercontent.com/anthropics/claude-code/refs/heads/main/CHANGELOG.md"
@@ -416,9 +417,8 @@ def call_llm(messages: list[dict[str, str]], api_key: str) -> CallResult:
         choice = response.choices[0]
         content = choice.message.content or ""
         usage = response.usage
-        hidden = getattr(response, "_hidden_params", {}) or {}
-        headers = hidden.get("additional_headers", {}) or {}
-        cost = headers.get("llm_provider-x-litellm-response-cost")
+        # OpenRouter 在 usage.cost 中返回本次调用费用
+        cost = getattr(usage, "cost", None)
         return CallResult(
             content=content.strip(),
             finish_reason=str(choice.finish_reason or ""),

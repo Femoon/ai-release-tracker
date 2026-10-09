@@ -24,7 +24,7 @@ A monitoring tool for tracking version updates of AI coding tools. Automatically
 
 - Monitor multiple AI coding tools for version updates
 - Parse changelogs from GitHub (CHANGELOG.md or Atom feed)
-- AI-powered translation using LiteLLM (supports multiple providers)
+- AI-powered translation via any OpenAI-compatible API (OpenRouter by default)
 - Bilingual Telegram notifications
 - GitHub Actions for automated checking every 30 minutes
 - Docker support for self-hosting
@@ -174,7 +174,7 @@ docker-compose auto-loads the `.env` file from project root.
 2. Parse latest version number and changelog content
 3. Compare with local `output/*_latest_version.txt`
 4. If version changed, print changelog and update local record
-5. Translate content using AI (via LiteLLM)
+5. Translate content using AI (via the openai SDK)
 6. Send bilingual Telegram notification
 
 ## License
