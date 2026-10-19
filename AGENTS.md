@@ -7,7 +7,8 @@
 main.py              依次以子进程运行 4 个 checker，任一失败则非零退出
 core/
   notify/            telegram.py（双语消息、编辑）、telegraph.py（长文发布）
-  translate/         llm.py（翻译与摘要）、policy.py（placeholder 保护与校验）、cache.py
+  translate/         llm.py（翻译与摘要）、policy.py（placeholder 保护与校验）、cache.py；
+                     translation_flow_prototype.py 为对比翻译流程的原型脚本，会真实调用 LLM，生产代码不导入
   state/             message_state.py（已发送消息 ID、内容 hash、编辑次数）
   utils/             clean.py（release body 清洗）、content.py（通知内容裁剪）
 products/<name>/
@@ -15,6 +16,8 @@ products/<name>/
   pusher.py          手动批量补推历史版本
   fetcher.py         导出全部版本到 output/（codex、openclaw）
   其他               产品专属的数据源与内容筛选（releases.py、source.py、content.py）
+scripts/             deploy.sh（部署）及频道历史审计与修复脚本，见下方说明
+docs/                调研记录与历次 review
 output/              运行时状态与翻译缓存，不入库
 ```
 
@@ -40,6 +43,20 @@ uv run python products/hermes/pusher.py --tag <tag> / --edit-tag <tag> / --edit-
 **`--force` 和 pusher 会真实发送到配置的频道。** 本地 `.env` 若配置了生产 bot，
 测试时先清空对应的 `*_BOT_TOKEN`，或只调用翻译函数而不走发送路径。
 
+`scripts/` 下的频道历史工具同样作用于公开频道，产物默认写入 `output/channel-review/`：
+
+- 只读：`audit_channel_history.py`（快照频道与 Telegraph 页面）、`prepare_article_repairs.py`
+  （生成修复计划）、`validate_article_repairs.py`、`validate_latest_public.py`。
+- 只读但**会真实调用 LLM**：`prepare_translation_repairs.py` 为脚本内硬编码的目标重新翻译和生成摘要，
+  走生产的质量门槛，不合格的目标标为 failed、不降级为英文；输出 `translation-repairs.json` 及逐条审阅对照。
+  `--only <channel>/<id>` 只处理指定目标。
+- **会修改线上内容：** `apply_article_repairs.py` 直接按计划编辑已有 Telegraph 页面（无确认开关）；
+  `repair_channel_history.py --apply` 原位编辑 Telegram 消息（不带 `--apply` 时只生成计划）；
+  `apply_translation_repairs.py --apply` 按翻译修复计划原位编辑页面和消息（不带 `--apply` 时只检查线上内容
+  是否在生成计划后被改动，有改动则拒绝执行）。
+  这些脚本都不发送新消息、不删除消息，也不读写 `output/` 下的版本记录和消息状态。
+  修复已发布内容时只用它们原位编辑；pusher 和 `--force` 会发送新消息，不能用来修复。
+
 ## 数据流
 
 checker 流程：获取最新稳定版本 → 与 `output/<name>_latest_version.txt` 比对 →
@@ -54,7 +71,7 @@ checker 流程：获取最新稳定版本 → 与 `output/<name>_latest_version.
 | Hermes | Releases API（Atom 备用） | 稳定 CalVer tag |
 
 已发送版本若 release notes 后续变化，checker 会原位编辑已有消息，每个版本最多编辑
-`MAX_EDITS_PER_VERSION` 次（`core/state/message_state.py`）。
+`MAX_EDITS_PER_VERSION` 次（`core/state/message_state.py`，当前为 1）。
 
 ## 不变量与约定
 
@@ -107,7 +124,12 @@ checker 流程：获取最新稳定版本 → 与 `output/<name>_latest_version.
   `docker compose run --rm version-checker`，外层用 `flock` 防止重叠；
   状态通过 `./output:/app/output` 持久化，配置来自服务器上的 `.env`。
 - 部署使用 `scripts/deploy.sh`：运行测试 → rsync 同步代码 → 重建镜像并验证导入。
-  目标读取自 `.deploy.env`（不入库，参考 `.deploy.env.example`）。可先用 `--dry-run` 核对同步列表。
+  目标读取自 `.deploy.env`（不入库，参考 `.deploy.env.example`）。可先用 `--dry-run` 核对同步列表，
+  `--skip-tests` 跳过测试。同步和重建都持有与 cron 共用的 `flock` 锁（`DEPLOY_LOCK`，最多等待 900 秒），
+  因此部署会等正在运行的检查结束后再执行。
+- `deploy.sh` 同步的是当前工作区，包括未提交的改动。只想部署已提交的代码时，先用 `git archive HEAD`
+  导出到临时目录、复制 `.deploy.env` 后在那里运行；不要用 `git worktree`，它的 `.git` 是文件，
+  不受 `--exclude=/.git/` 排除，会被同步到服务器。
 - 服务器目录不是 git 仓库，不要在服务器上直接修改代码。部署必须保留服务器的 `.env` 和 `output/`。
 - 本地修改不等于生产已部署。
 
