@@ -448,6 +448,27 @@ def _strip_fixes_section(text: str) -> str:
     return truncated
 
 
+def build_changelog_html(
+    original: str,
+    translated: str = None,
+    source_url: str = None,
+    primary_language: str = "English",
+) -> str:
+    """构建 Telegraph 更新日志正文：原文、可选译文和原始链接。"""
+    parts = [markdown_to_html(f"## {primary_language}\n\n{original}")]
+    if translated:
+        parts.append("<hr>")
+        parts.append(markdown_to_html(f"## 中文\n\n{translated}"))
+    if source_url:
+        parts.append("<hr>")
+        parts.append(
+            markdown_to_html(
+                f"[View complete GitHub Release | 查看 GitHub 完整日志]({source_url})"
+            )
+        )
+    return "\n".join(parts)
+
+
 def publish_changelog(
     title: str,
     original: str,
@@ -488,18 +509,7 @@ def publish_changelog(
         trans: str = None,
         primary_language: str = "English",
     ) -> str:
-        parts = [markdown_to_html(f"## {primary_language}\n\n{orig}")]
-        if trans:
-            parts.append("<hr>")
-            parts.append(markdown_to_html(f"## 中文\n\n{trans}"))
-        if source_url:
-            parts.append("<hr>")
-            parts.append(
-                markdown_to_html(
-                    f"[View complete GitHub Release | 查看 GitHub 完整日志]({source_url})"
-                )
-            )
-        return "\n".join(parts)
+        return build_changelog_html(orig, trans, source_url, primary_language)
 
     # 第一次尝试：完整内容
     content_html = _build_html(original, translated)
